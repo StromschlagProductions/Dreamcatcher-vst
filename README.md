@@ -54,6 +54,10 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
   0 auf 100 % fahren. Die Stimme wächst aus dem Hier und Jetzt in die Erinnerung hinein.
 - **Aufwachen:** Spur auf Traum, Effekt vom Ende der Traumszene an auf 0 % zurückfahren: Die Stimme wird direkter und klarer.
 - **Innere Stimme:** Spur auf Innere Stimme, Effekt auf 100 %. Zum Zurückholen ins Gespräch auf 0 % fahren.
+- **Auf einem Bus:** DREAMCATCHER lässt sich auch auf einen Gruppenkanal legen. So bekommen die Stimme und die Geräusche
+  einer Traum- oder Erinnerungsszene (Atmo, Schritte, Musik) gemeinsam dieselbe Behandlung und wirken wie aus einer
+  Welt. Der Effekt arbeitet dann auf der Summe, jede Quelle behält ihren Platz im Stereobild. Ein Fader auf dem Bus
+  blendet die ganze Szene zusammen in den Effekt hinein oder zurück ins Hier und Jetzt.
 - **Ein Fehler beim Abmischen:** Effekt kurz auf 0 % ziehen, die Stimme ist sofort wieder unbearbeitet.
 
 ## Hinweise
@@ -77,6 +81,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Sie wird bei jeder
 Änderung hochgezählt.
 
+- **1.2** – Hinweis zur Nutzung auf einem Bus in README und Plugin-Hilfe ergänzt.
 - **1.1** – README um den Absatz „Gestalten nicht ersetzen“ ergänzt.
 - **1.0** – Erste Version: Modi Innere Stimme, Erinnerung und Traum, Effekt-Fader 0–100 %, Oberfläche im Stil von
   LOCATIONS und RADIOPHONE mit Hilfe, Hell/Dunkel und skalierbarem Fenster.

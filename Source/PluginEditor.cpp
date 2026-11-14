@@ -74,6 +74,9 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
           "ein paar Millisekunden hinter der unbearbeiteten, das ist Teil des Klangs. Nach dem Ende der Stimme klingt die Echo-Wolke noch kurz nach.");
     body ("Doppelklick auf den Fader setzt ihn auf 100 % zurück. Look: Dunkel / Hell, das Fenster ist am rechten unteren Rand skalierbar (50–300 %), "
           "beides wird mit dem Projekt gespeichert.");
+    body ("Auch auf einem Bus: Du kannst Dreamcatcher auf einen Gruppenkanal legen, damit die Stimme und die Geräusche einer Traum- oder "
+          "Erinnerungsszene (Atmo, Schritte, Musik) gemeinsam dieselbe Behandlung bekommen und wie aus einer Welt klingen. Der Effekt arbeitet "
+          "dann auf der Summe. Der Fader auf dem Bus blendet die ganze Szene zusammen in den Effekt hinein oder zurück.");
     body ("Der Eingang wird als Stereo verarbeitet. Eine Mono-Spur bekommt durch das Plugin eine Stereobreite.");
 
     head ("Idee und Konzept");
