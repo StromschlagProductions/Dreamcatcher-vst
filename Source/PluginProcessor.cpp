@@ -10,12 +10,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout DreamcatcherProcessor::creat
     AudioProcessorValueTreeState::ParameterLayout layout;
 
     auto percent = AudioParameterFloatAttributes().withStringFromValueFunction (
-        [] (float v, int) { return String (roundToInt (v * 100.0f)) + " %"; });
+        [] (float v, int) { return String (roundToInt (v * 100.0f)) + " %"; })
+        .withValueFromStringFunction ([] (const String& t) { return t.retainCharacters ("0123456789.,").replaceCharacter (',', '.').getFloatValue() / 100.0f; });
 
     layout.add (std::make_unique<AudioParameterChoice> (ParameterID { "mode", 1 }, "Modus", modeNames(), 0));
     // 0 % = Stimme unbearbeitet, 100 % = voller Klang des Modus (Standard: 100 %)
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "dream", 1 }, "Effekt",
                                                        NormalisableRange<float> (0.0f, 1.0f), 1.0f, percent));
+    // Hall und Echo: 100 % = so, wie der Modus abgestimmt ist; 0 % = weg, 200 % = doppelt (im Modus Geist: Reverse-Hall / Reverse-Echo)
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "hall", 1 }, "Hall", NormalisableRange<float> (0.0f, 2.0f), 1.0f, percent));
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "echo", 1 }, "Echo", NormalisableRange<float> (0.0f, 2.0f), 1.0f, percent));
     return layout;
 }
 
@@ -27,6 +31,8 @@ DreamcatcherProcessor::DreamcatcherProcessor()
 {
     pMode = apvts.getRawParameterValue ("mode");
     pDream = apvts.getRawParameterValue ("dream");
+    pHall = apvts.getRawParameterValue ("hall");
+    pEcho = apvts.getRawParameterValue ("echo");
 }
 
 void DreamcatcherProcessor::prepareToPlay (double sampleRate, int)
@@ -62,7 +68,7 @@ void DreamcatcherProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     engine.setMode (juce::roundToInt (pMode->load()));
     float* l = buffer.getWritePointer (0);
     float* r = numCh > 1 ? buffer.getWritePointer (1) : nullptr;
-    engine.process (l, r, numSamples, (double) pDream->load());
+    engine.process (l, r, numSamples, (double) pDream->load(), (double) pHall->load(), (double) pEcho->load());
 
     if (engine.latencySamples() != reportedLatency.load())
     {

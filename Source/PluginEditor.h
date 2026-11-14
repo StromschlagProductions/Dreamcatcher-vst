@@ -71,6 +71,16 @@ private:
     juce::Slider fader;
     std::unique_ptr<APVTS::SliderAttachment> faderAtt;
 
+    struct Knob
+    {
+        juce::Slider slider;
+        juce::Label label;
+        std::unique_ptr<APVTS::SliderAttachment> attachment;
+    };
+    void setupKnob (Knob&, const juce::String& paramId);
+    void updateKnobLabels();
+    Knob hallKnob, echoKnob;
+
     juce::TextButton themeButton, helpButton;
     HelpPanel helpScroll;
     HelpView helpText;

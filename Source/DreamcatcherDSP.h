@@ -58,7 +58,7 @@ static const Voicing kVoicing[kNumModes] = {
     // Traum: koernig verstimmt, weite Wolke, dazu langsam anschwellende Echos
     { 0.00, 0.75, 0.20, 0.30, 0.90, 0.60, 160.0, 4200.0, 1.50,   0.40,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00 },
     // Geist: der Hall laeuft rueckwaerts und schwillt vor der Stimme an (Latenz, siehe kGhostSeconds)
-    { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 0.82,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95 },
+    { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 0.78,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95 },
 };
 
 // Tap-Verlauf der Schwapp-Echos (8 Echos): abfallend bzw. anschwellend, Mischung ueber echoSwell
@@ -68,6 +68,8 @@ constexpr double kEchoSwell[8] = { 0.18, 0.34, 0.52, 0.66, 0.58, 0.40, 0.24, 0.1
 // Reverse-Hall (Geist): Laenge des Schwells in Sekunden, Abklingrate des Halls (in dB ueber die Laenge)
 constexpr double kGhostSeconds = 0.60;
 constexpr double kGhostDecayDb = 48.0;
+constexpr double kGhostRevEcho = 0.55;     // Geist: Pegel des Reverse-Echos (rueckwaerts gespielte Stuecke, die in die Stimme hineinsaugen)
+constexpr double kGhostRevEchoLpHz = 3200.0;
 
 // GlitchShifter (Erinnerung): Tonhoehenabfall und Griffigkeit, feste Werte
 constexpr double kGlitchSpeed = -0.035;     // negativ = tiefer (ca. -0,6 Halbtoene)
@@ -690,6 +692,12 @@ public:
         for (int m = 0; m < kNumModes; ++m) room[m].prepare (sr, kRoom[m]);
         ghostDelay = swell.latency();
         for (auto* r : { &dlL, &dlR, &dryL, &dryR }) r->init (ghostDelay);
+        {
+            int m = 1; while (m < ghostDelay + 4) m <<= 1;
+            revBuf.assign ((size_t) m, 0.0); revMask = m - 1; revPos = 0;
+            revLen = std::max (64, ghostDelay / 2);   // Stuecklaenge: endet genau dort, wo die (verzoegerte) Stimme ist
+            revCoef = 1.0 - std::exp (-2.0 * 3.14159265358979323846 * kGhostRevEchoLpHz / sr);
+        }
         reset();
         snapToMode (mode);
     }
@@ -701,6 +709,7 @@ public:
         std::fill (echoBuf.begin(), echoBuf.end(), 0.0);
         echoLpL = echoLpR = 0.0;
         for (auto* r : { &dlL, &dlR, &dryL, &dryR }) r->clear();
+        std::fill (revBuf.begin(), revBuf.end(), 0.0); revPos = 0; revPhase = 0; revLpL = revLpR = 0.0;
         ghostRunning = false;
         for (int m = 0; m < kNumModes; ++m) { room[m].reset(); roomRunning[m] = false; }
     }
@@ -709,10 +718,11 @@ public:
     int latencySamples() const { return mode == kGhost ? ghostDelay : 0; }
 
     // dream: 0..1 (0 = unbearbeitete Stimme, 1 = voller Klang)
-    void process (float* left, float* right, int n, double dream)
+    // hall, echo: 0..2 (1 = so, wie der Modus abgestimmt ist)
+    void process (float* left, float* right, int n, double dream, double hall = 1.0, double echo = 1.0)
     {
         const Voicing& v = kVoicing[mode];
-        if (! started) { amount = dream; started = true; }
+        if (! started) { amount = dream; hallK = hall; echoK = echo; started = true; }
         const double ghostTarget = mode == kGhost ? 1.0 : 0.0;
         for (int i = 0; i < n; ++i)
         {
@@ -726,10 +736,12 @@ public:
             cur.lowpassHz += (v.lowpassHz - cur.lowpassHz) * smooth;
             cur.trim += (v.trim - cur.trim) * smooth;
             amount += (dream - amount) * fader;
+            hallK += (hall - hallK) * fader;
+            echoK += (echo - echoK) * fader;
             ghostAmt += (ghostTarget - ghostAmt) * smooth;
 
             // Echo-Zeiten gehoeren zum Modus: Echos erst ausblenden, dann Zeiten wechseln (kein Pitch-Rutschen)
-            const double echoTarget = (echoMode == mode) ? kVoicing[echoMode].echoLevel : 0.0;
+            const double echoTarget = (echoMode == mode) ? kVoicing[echoMode].echoLevel * echoK : 0.0;
             echoLevel += (echoTarget - echoLevel) * smooth;
             if (echoMode != mode && echoLevel < 0.002) setEchoMode (mode);
 
@@ -777,7 +789,7 @@ public:
 
             // 3. Breite und Echo-Wolke
             if (cur.wideSoar > 0.0005) sweetWide (l, r, cur.wideSoar, cur.wideBlend);
-            ens.process (l, r, cur.ensLevel);
+            ens.process (l, r, std::min (1.0, cur.ensLevel * echoK));
             l += echoLpL * echoLevel;
             r += echoLpR * echoLevel;
 
@@ -789,14 +801,28 @@ public:
             double outDryL = rawL, outDryR = rawR;
             const double dgl = dlL.tick (l), dgr = dlR.tick (r);        // verzoegerte Stimme (laeuft immer mit)
             const double drl = dryL.tick (rawL), drr = dryR.tick (rawR);
-            if (ghostTarget > 0.0 && ! ghostRunning) { swell.reset(); ghostRunning = true; }
+            if (ghostTarget > 0.0 && ! ghostRunning) { swell.reset(); std::fill (revBuf.begin(), revBuf.end(), 0.0); revLpL = revLpR = 0.0; ghostRunning = true; }
             if (ghostRunning)
             {
                 double wl = 0.0, wr = 0.0;
-                swell.tick (0.5 * (l + r), wl, wr);
+                const double gm = 0.5 * (l + r);
+                swell.tick (gm, wl, wr);
+                // Reverse-Echo: Stuecke der kommenden Stimme werden rueckwaerts gespielt und enden genau am Wort
+                revBuf[(size_t) (revPos & revMask)] = gm;
+                auto grain = [this] (int k)
+                {
+                    const double w = std::sin (3.14159265358979323846 * (double) k / (double) revLen);
+                    return w * w * revBuf[(size_t) ((revPos - 2 * k) & revMask)];
+                };
+                const int h = revLen / 2, q = revLen / 4;
+                const int k1 = revPhase, k2 = (revPhase + h) % revLen, k3 = (revPhase + q) % revLen, k4 = (k3 + h) % revLen;
+                revLpL += revCoef * (grain (k1) + grain (k2) - revLpL);
+                revLpR += revCoef * (grain (k3) + grain (k4) - revLpR);
+                ++revPos; if (++revPhase >= revLen) revPhase = 0;
+                const double re = kGhostRevEcho * echoK;
                 const Voicing& gv = kVoicing[kGhost];
-                const double gL = dgl * gv.ghostDry + wl * gv.ghostWet;
-                const double gR = dgr * gv.ghostDry + wr * gv.ghostWet;
+                const double gL = dgl * gv.ghostDry + wl * gv.ghostWet * hallK + revLpL * re;
+                const double gR = dgr * gv.ghostDry + wr * gv.ghostWet * hallK + revLpR * re;
                 l = l * (1.0 - ghostAmt) + gL * ghostAmt;
                 r = r * (1.0 - ghostAmt) + gR * ghostAmt;
                 outDryL = rawL * (1.0 - ghostAmt) + drl * ghostAmt;
@@ -809,7 +835,7 @@ public:
                 double hl = 0.0, hr = 0.0;
                 for (int m = 0; m < kNumModes; ++m)
                 {
-                    const double target = m == mode ? kRoom[m].level : 0.0;
+                    const double target = m == mode ? kRoom[m].level * hallK : 0.0;
                     roomLevel[m] += (target - roomLevel[m]) * smooth;
                     if (! roomRunning[m])
                     {
@@ -882,5 +908,10 @@ private:
     bool roomRunning[kNumModes] {};
     Ring dlL, dlR, dryL, dryR;
     int ghostDelay = 1;
+    std::vector<double> revBuf;
+    int revMask = 0, revPos = 0, revPhase = 0, revLen = 64;
+    double revCoef = 0.3, revLpL = 0.0, revLpR = 0.0;
+    // Regler Hall / Echo (geglaettet)
+    double hallK = 1.0, echoK = 1.0;
 };
 }  // namespace dch

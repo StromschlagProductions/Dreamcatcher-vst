@@ -42,6 +42,8 @@ private:
     dch::Engine engine;
     std::atomic<float>* pMode = nullptr;
     std::atomic<float>* pDream = nullptr;
+    std::atomic<float>* pHall = nullptr;
+    std::atomic<float>* pEcho = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DreamcatcherProcessor)
 };

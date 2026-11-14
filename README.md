@@ -1,4 +1,4 @@
-# DREAMCATCHER – Audio Drama Inner-Voice-Simulator
+# DREAMCATCHER – Audio Drama Mindscape Simulator
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dunkel.png">
@@ -7,7 +7,7 @@
 
 VST3-Insert-Effekt für Hörspiel-Produktion. Er lässt eine Stimme klingen, als käme sie nicht aus dem Raum der Szene,
 sondern von innen: als **innere Stimme**, als **Erinnerung / Rückblende**, im **Traum** oder als **Geist** mit echtem Reverse-Hall. Ein Modus-Schalter, ein
-Fader, fertig.
+Fader und zwei Drehregler für Hall und Echo, fertig.
 
 **⬇ Download (Windows · VST3 · Stereo):** https://github.com/StromschlagProductions/Dreamcatcher-vst/releases/latest
 
@@ -24,7 +24,7 @@ Echo, Filter und Automation ineinandergreifen. Ich bin dankbar, dass ich diesen 
 manchmal umständlich und mühselig war. Gerade dadurch weiß ich, was ich mir von einem Werkzeug wünsche, das all das in
 einem vereint. DREAMCATCHER soll das Gestalten nicht ersetzen, sondern die technische Umsetzung im Alltag einfacher machen.
 
-Der Klang jedes Modus ist fest abgestimmt. Es gibt keinen Ausgangsregler, und es werden keine eigenen Geräusche
+Der Klang jedes Modus ist fest abgestimmt; mit Hall und Echo lässt er sich nachjustieren. Es gibt keinen Ausgangsregler, und es werden keine eigenen Geräusche
 dazugemischt: Das Plugin verändert nur den Klang der Stimme.
 
 – Lars Eickstädt, Stromschlag Audio
@@ -35,15 +35,16 @@ dazugemischt: Das Plugin verändert nur den Klang der Stimme.
 |---|---|
 | ![Erinnerung](docs/oberflaeche-dunkel.png) | ![Traum](docs/oberflaeche-hell.png) |
 
-Oben wählt man den Modus, darunter steht der **Effekt-Fader**. Der **?**-Knopf öffnet die Hilfe, Look Dunkel/Hell und
+Oben wählt man den Modus, darunter stehen der **Effekt-Fader** und die Drehregler **Hall** und **Echo**. Der **?**-Knopf öffnet die Hilfe, Look Dunkel/Hell und
 die Fenstergröße (50–300 %) werden mit dem Projekt gespeichert. Zu jedem Regler gibt es einen Tooltip.
 
 ## Modi und Regler (beide automatisierbar)
 
 | Regler | Wirkung |
 |---|---|
-| **Modus** | **Innere Stimme:** Die Stimme rückt ins Innere des Kopfes: schmal, nah, ein winziger, enger Raum und ein Hauch Echo, Höhen weicher, Tiefen weg. **Erinnerung:** Die Stimme stottert, sinkt ab, klingt dünn und dumpf in einem kleinen, alten Zimmer; nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts heran und schwellen an (wop, wop), für Rückblenden. **Traum:** körnig verstimmt, in einem riesigen, dunklen, schwebenden Hall mit einer Echo-Wolke, die langsam anschwillt. **Geist:** echter Reverse-Hall, vor jedem Wort schwillt ein Geisterhall an, dann kommt die Stimme und hallt nach (meldet rund 0,6 s Latenz). Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über. |
+| **Modus** | **Innere Stimme:** Die Stimme rückt ins Innere des Kopfes: schmal, nah, ein winziger, enger Raum und ein Hauch Echo, Höhen weicher, Tiefen weg. **Erinnerung:** Die Stimme stottert, sinkt ab, klingt dünn und dumpf in einem kleinen, alten Zimmer; nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts heran und schwellen an (wop, wop), für Rückblenden. **Traum:** körnig verstimmt, in einem riesigen, dunklen, schwebenden Hall mit einer Echo-Wolke, die langsam anschwillt. **Geist:** echter Reverse-Hall, vor jedem Wort schwillt ein Geisterhall an und rückwärts gespielte Stücke saugen ins Wort hinein, dann kommt die Stimme und hallt nach (meldet rund 0,6 s Latenz). Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über. |
 | **Effekt** | 0 % = die Stimme unbearbeitet, 100 % = der volle Klang des Modus, dazwischen fließend (Standard: 100 %). Doppelklick setzt auf 100 % zurück. |
+| **Hall** / **Echo** | Drehregler 0–200 %: 100 % = so, wie der Modus abgestimmt ist, 0 % = aus, 200 % = doppelt so viel. Im Modus Geist heißen sie **Reverse-Hall** und **Reverse-Echo**: so wählst du nur den rückwärts anschwellenden Hall, nur die rückwärts gespielten Echos oder beides. Doppelklick setzt auf 100 % zurück. |
 
 Das ist wie bei LOCATIONS: Ein Fader bewegt die Stimme zwischen zwei Zuständen. Hier sind es die normal klingende
 Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
@@ -83,6 +84,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Sie wird bei jeder
 Änderung hochgezählt.
 
+- **1.5** – Drehregler Hall und Echo (0–200 %, 100 % = Preset); im Modus Geist zusätzlich Reverse-Echo, die Regler heißen dort Reverse-Hall und Reverse-Echo. Neuer Untertitel „Audio Drama Mindscape Simulator“, mehr Luft um das Traumfänger-Symbol.
 - **1.4** – Echter Hall in allen Modi (nach Airwindows Galactic), je Modus ein eigener Raum: winzig (Innere Stimme), kleines dumpfes Zimmer (Erinnerung), riesige dunkle Halle (Traum), Nachhall hinter der Stimme (Geist). Pegel neu abgeglichen.
 - **1.3** – Modi deutlich stärker unterschieden; neues Schwapp-Echo mit Pre-Delay (Ping-Pong, abfallend oder anschwellend) in Erinnerung und Traum; vierter Modus Geist mit echtem Reverse-Hall (Latenz nur in diesem Modus).
 - **1.2** – Hinweis zur Nutzung auf einem Bus in README und Plugin-Hilfe ergänzt.

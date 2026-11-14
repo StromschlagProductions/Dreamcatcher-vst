@@ -22,8 +22,8 @@ juce::String modeDescription (int m)
             return u8 ("Die Stimme ist körnig verstimmt und liegt in einem riesigen, dunklen, schwebenden Hall mit einer Echo-Wolke, "
                        "die langsam heranschwillt. Für Träume, Fieber und Halbschlaf.");
         default:
-            return u8 ("Reverse-Hall: Vor jedem Wort schwillt ein Geisterhall an, dann kommt die Stimme und hallt nach. Das Plugin meldet dafür rund 0,6 s Latenz, die "
-                       "die DAW ausgleicht. Für Geister und Erscheinungen. Am besten auf einer eigenen Spur oder Plugin-Instanz.");
+            return u8 ("Reverse-Hall und Reverse-Echo: Vor jedem Wort schwillt ein Geisterhall an und rückwärts gespielte Stücke saugen ins Wort hinein. Das Plugin meldet dafür rund 0,6 s Latenz, die "
+                       "die DAW ausgleicht. Für Geister und Erscheinungen. Am besten auf einer eigenen Spur.");
     }
 }
 juce::String modeShort (int m)
@@ -57,16 +57,24 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
               juce::Font (juce::FontOptions (17.0f, juce::Font::bold)), accent);
 
     body ("Dreamcatcher ist ein Insert-Effekt für Stimmen, die nicht im Raum der Szene sprechen: innere Stimme, Erinnerung und Traum. "
-          "Der Klang jedes Modus ist fest abgestimmt, es gibt nichts zu basteln. Es gibt nur zwei Regler: den Modus und den Effekt-Fader.");
+          "Der Klang jedes Modus ist fest abgestimmt. Bedient wird es mit dem Modus, dem Effekt-Fader und zwei Drehreglern, mit denen du Hall und Echo des Modus anpasst.");
 
     head ("MODUS");
     body ("Innere Stimme: Die Stimme rückt ins Innere des Kopfes. Schmal und nah, ein winziger, enger Raum, ein Hauch Echo, Höhen weicher, Tiefen weg.");
     body ("Erinnerung: Die Stimme stottert, sinkt ab, klingt dünn und dumpf in einem kleinen, alten Zimmer. Nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts "
           "heran und schwellen an (wop, wop). Gedacht für Rückblenden.");
     body ("Traum: Körnig verstimmt, in einem riesigen, dunklen, leicht schwebenden Hall und einer Echo-Wolke, die langsam anschwillt.");
-    body ("Geist: Echter Reverse-Hall. Vor jedem Wort schwillt ein Geisterhall an, dann erst kommt die Stimme, danach hallt sie normal nach. Dafür muss das Plugin die Stimme "
+    body ("Geist: Echter Reverse-Hall. Vor jedem Wort schwillt ein Geisterhall an, dann erst kommt die Stimme, danach hallt sie normal nach. Dazu kommt ein Reverse-Echo: Stücke der Stimme werden rückwärts gespielt und saugen ins Wort hinein. Dafür muss das Plugin die Stimme "
           "um rund 0,6 Sekunden verzögern und meldet diese Latenz dem Host; die DAW gleicht sie aus, sodass der Schwell hörbar VOR der Stimme liegt.");
     body ("Der Modus lässt sich automatisieren. Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über, es knackt nicht.");
+
+    head ("HALL und ECHO (Drehregler, 0–200 %)");
+    body ("Mit den beiden Drehreglern passt du den Modus an. 100 % ist der Klang, wie der Modus abgestimmt ist, 0 % schaltet Hall bzw. Echo ab, "
+          "200 % gibt doppelt so viel. So kannst du zum Beispiel die Innere Stimme mit mehr Raum spielen oder den Traum ohne Echos. "
+          "Doppelklick setzt einen Regler auf 100 % zurück. Beide lassen sich automatisieren und gelten für den gerade gewählten Modus.");
+    body ("Im Modus Geist heißen die Regler Reverse-Hall und Reverse-Echo: Damit wählst du, ob nur der rückwärts anschwellende Hall, nur die "
+          "rückwärts gespielten Echos oder beides vor der Stimme liegen.");
+    note ("Mehr Hall oder Echo macht den Klang lauter, weniger leiser; der Pegelausgleich gilt für die Einstellung 100 %.");
 
     head ("EFFEKT (Fader, 0–100 %)");
     body ("0 % = die Stimme unbearbeitet, 100 % = der volle Klang des gewählten Modus. Dazwischen blendet der Fader fließend über. "
@@ -114,7 +122,7 @@ DreamcatcherEditor::DreamcatcherEditor (DreamcatcherProcessor& p) : AudioProcess
     modeButtons[0].setTooltip (u8 ("Die Stimme im Kopf einer Figur: nah, leicht verbreitert, weich"));
     modeButtons[1].setTooltip (u8 ("Rückblende: stotternd, abgesunken, dünn und dumpf, mit heranschwappenden Echos"));
     modeButtons[2].setTooltip (u8 ("Traum: körnig verstimmt, in einer weiten, anschwellenden Echo-Wolke"));
-    modeButtons[3].setTooltip (u8 ("Geist: Reverse-Hall vor der Stimme (meldet ca. 0,6 s Latenz)"));
+    modeButtons[3].setTooltip (u8 ("Geist: Reverse-Hall und Reverse-Echo vor der Stimme (meldet ca. 0,6 s Latenz)"));
 
     fader.setSliderStyle (juce::Slider::LinearHorizontal);
     fader.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
@@ -122,6 +130,9 @@ DreamcatcherEditor::DreamcatcherEditor (DreamcatcherProcessor& p) : AudioProcess
     fader.setTooltip (u8 ("0 % = die Stimme unbearbeitet, 100 % = voller Klang des Modus. Per Automation einblenden oder zurückholen."));
     content.addAndMakeVisible (fader);
     faderAtt = std::make_unique<APVTS::SliderAttachment> (processor.apvts, "dream", fader);
+
+    setupKnob (hallKnob, "hall");
+    setupKnob (echoKnob, "echo");
 
     themeButton.onClick = [this]
     {
@@ -189,12 +200,39 @@ void DreamcatcherEditor::updateModeButtons()
     const int m = currentMode();
     for (int i = 0; i < 4; ++i)
         modeButtons[i].setToggleState (i == m, juce::dontSendNotification);
+    updateKnobLabels();
+}
+
+void DreamcatcherEditor::setupKnob (Knob& k, const juce::String& paramId)
+{
+    k.slider.setSliderStyle (juce::Slider::RotaryVerticalDrag);
+    k.slider.setMouseDragSensitivity (180);
+    k.slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 80, 18);
+    k.slider.setDoubleClickReturnValue (true, 1.0);
+    content.addAndMakeVisible (k.slider);
+    k.label.setJustificationType (juce::Justification::centred);
+    k.label.setFont (juce::FontOptions (12.0f, juce::Font::bold));
+    content.addAndMakeVisible (k.label);
+    k.attachment = std::make_unique<APVTS::SliderAttachment> (processor.apvts, paramId, k.slider);
+}
+
+void DreamcatcherEditor::updateKnobLabels()
+{
+    const bool ghost = currentMode() == dch::kGhost;
+    hallKnob.label.setText (ghost ? u8 ("REVERSE-HALL") : u8 ("HALL"), juce::dontSendNotification);
+    echoKnob.label.setText (ghost ? u8 ("REVERSE-ECHO") : u8 ("ECHO"), juce::dontSendNotification);
+    hallKnob.slider.setTooltip (ghost ? u8 ("Reverse-Hall vor der Stimme und Nachhall: 100 % = wie abgestimmt, 0 % = aus, 200 % = doppelt. Doppelklick: 100 %")
+                                      : u8 ("Hall: 100 % = wie der Modus abgestimmt ist, 0 % = kein Hall, 200 % = doppelt so viel. Doppelklick: 100 %"));
+    echoKnob.slider.setTooltip (ghost ? u8 ("Reverse-Echo: rückwärts gespielte Stücke, die ins Wort hineinsaugen. 100 % = wie abgestimmt, 0 % = aus. Doppelklick: 100 %")
+                                      : u8 ("Echo: 100 % = wie der Modus abgestimmt ist, 0 % = keine Echos, 200 % = doppelt so viel. Doppelklick: 100 %"));
 }
 
 void DreamcatcherEditor::applyTheme()
 {
     look.setColour (juce::Slider::thumbColourId, theme.accent);
     look.setColour (juce::Slider::trackColourId, theme.accent);
+    look.setColour (juce::Slider::rotarySliderFillColourId, theme.accent);
+    look.setColour (juce::Slider::rotarySliderOutlineColourId, theme.line);
     look.setColour (juce::Slider::backgroundColourId, theme.line);
     look.setColour (juce::Slider::textBoxTextColourId, theme.text);
     look.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
@@ -203,6 +241,7 @@ void DreamcatcherEditor::applyTheme()
     look.setColour (juce::PopupMenu::highlightedBackgroundColourId, theme.accent);
     look.setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::black);
     look.setColour (juce::Label::textColourId, theme.text);
+    for (auto* k : { &hallKnob, &echoKnob }) k->label.setColour (juce::Label::textColourId, theme.dim);
     look.setColour (juce::TextButton::buttonColourId, theme.dark ? theme.panel : theme.bg);
     look.setColour (juce::TextButton::buttonOnColourId, theme.accent);
     look.setColour (juce::TextButton::textColourOffId, theme.text);
@@ -243,7 +282,7 @@ void DreamcatcherEditor::paint (juce::Graphics& g)
         juce::GlyphArrangement ga; ga.addLineOfText (f, t, 0.0f, 0.0f);
         return ga.getBoundingBox (0, -1, true).getWidth();
     };
-    const juce::String sub = "AUDIO DRAMA INNER-VOICE-SIMULATOR";
+    const juce::String sub = "AUDIO DRAMA MINDSCAPE SIMULATOR";
     const float subX = 80.0f + textWidth (titleFont, "DREAMCATCHER") + 16.0f;
     g.setColour (theme.text);
     g.setFont (titleFont);
@@ -284,9 +323,9 @@ void DreamcatcherEditor::paint (juce::Graphics& g)
             feathers.addEllipse (s.x1 - 1.3f, s.y1 - 0.5f, 2.6f, 5.5f);
         }
         const float subEnd = subX + textWidth (subFont, sub);
-        const float helpX = (float) (kBaseW - 170);
+        const float helpX = (float) (kBaseW - 160);   // linke Kante von "Look"
         const float mid = 0.5f * (subEnd + helpX);
-        const auto place = juce::AffineTransform::scale (1.1f).translated (mid - 14.0f, 10.0f);
+        const auto place = juce::AffineTransform::scale (1.1f).translated (mid - 14.3f, 12.0f);
         for (auto* p : { &hoop, &web, &strings, &feathers }) p->applyTransform (place);
         const auto ink = theme.panel.interpolatedWith (theme.text, 0.30f);
         const auto fill = theme.panel.interpolatedWith (theme.text, 0.10f);
@@ -313,16 +352,18 @@ void DreamcatcherEditor::paint (juce::Graphics& g)
     // Karte Modus
     card (12.0f, 76.0f, (float) W - 24.0f, 84.0f, "MODUS");
     // Karte Effekt-Fader
-    card (12.0f, 170.0f, (float) W - 24.0f, 118.0f, "EFFEKT");
+    card (12.0f, 170.0f, 410.0f, 150.0f, "EFFEKT");
     g.setColour (theme.dim);
     g.setFont (juce::FontOptions (11.5f));
-    g.drawText (u8 ("0 %  ·  Stimme unbearbeitet"), 24, 196, 220, 16, juce::Justification::centredLeft);
-    g.drawText (u8 ("100 %  ·  voller Klang: ") + modeShort (m), W - 24 - 320, 196, 320, 16, juce::Justification::centredRight);
+    g.drawText (u8 ("0 %  ·  Stimme unbearbeitet"), 24, 206, 190, 16, juce::Justification::centredLeft);
+    g.drawText (u8 ("100 %  ·  voller Klang"), 410 - 190, 206, 190, 16, juce::Justification::centredRight);
+    // Karte Hall / Echo
+    card (432.0f, 170.0f, (float) W - 444.0f, 150.0f, m == dch::kGhost ? u8 ("REVERSE") : u8 ("HALL & ECHO"));
     // Karte Beschreibung
-    card (12.0f, 298.0f, (float) W - 24.0f, 110.0f, modeShort (m));
+    card (12.0f, 330.0f, (float) W - 24.0f, 78.0f, modeShort (m));
     g.setColour (theme.text);
     g.setFont (juce::FontOptions (13.0f));
-    g.drawFittedText (modeDescription (m), 24, 322, W - 48, 78, juce::Justification::topLeft, 4, 1.0f);
+    g.drawFittedText (modeDescription (m), 24, 352, W - 48, 54, juce::Justification::topLeft, 3, 1.0f);
 }
 
 void DreamcatcherEditor::resized()
@@ -338,7 +379,7 @@ void DreamcatcherEditor::resized()
     repaint();
 
     const int w = kBaseW;
-    themeButton.setBounds (w - 170, 18, 112, 28);
+    themeButton.setBounds (w - 160, 18, 104, 28);
     helpButton.setBounds (w - 48, 18, 32, 28);
     helpScroll.setBounds (12, 76, w - 24, 332);
     helpText.setWidth (helpScroll.getMaximumVisibleWidth());
@@ -347,7 +388,11 @@ void DreamcatcherEditor::resized()
     for (int i = 0; i < 4; ++i)
         modeButtons[i].setBounds (bx + i * (bw + 10), 106, bw, 44);
 
-    fader.setBounds (24, 214, w - 48, 66);
+    fader.setBounds (24, 228, 386, 72);
+    hallKnob.label.setBounds (440, 192, 110, 16);
+    echoKnob.label.setBounds (550, 192, 110, 16);
+    hallKnob.slider.setBounds (445, 208, 100, 106);
+    echoKnob.slider.setBounds (555, 208, 100, 106);
 
     helpScroll.toFront (false);
 }
