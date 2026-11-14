@@ -42,7 +42,7 @@ die Fenstergröße (50–300 %) werden mit dem Projekt gespeichert. Zu jedem Reg
 
 | Regler | Wirkung |
 |---|---|
-| **Modus** | **Innere Stimme:** Die Stimme rückt ins Innere des Kopfes: schmal, nah, ein winziger, enger Raum und ein Hauch Echo, Höhen weicher, Tiefen weg. **Erinnerung:** Die Stimme stottert, sinkt ab, klingt dünn und dumpf in einem kleinen, alten Zimmer; nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts heran und schwellen an (wop, wop), für Rückblenden. **Traum:** körnig verstimmt, in einem riesigen, dunklen, schwebenden Hall mit einer Echo-Wolke, die langsam anschwillt. **Geist:** echter Reverse-Hall, vor jedem Wort schwillt ein Geisterhall an und rückwärts gespielte Stücke saugen ins Wort hinein, dann kommt die Stimme und hallt nach (meldet rund 0,6 s Latenz). Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über. |
+| **Modus** | **Innere Stimme:** Die Stimme rückt ins Innere des Kopfes: schmal, nah, ein winziger, enger Raum und ein Hauch Echo, Höhen weicher, Tiefen weg. **Erinnerung:** Die Stimme stottert, sinkt ab, klingt dünn und dumpf in einem kleinen, alten Zimmer, leicht wie von einer leiernden Aufnahme; nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts heran und schwellen an (wop, wop), für Rückblenden. **Traum:** körnig verstimmt, die Tonhöhe wabert langsam, in einem riesigen, dunklen, schwebenden Hall mit einer Echo-Wolke, deren Wiederholungen schief wegdriften. **Geist:** echter Reverse-Hall, vor jedem Wort schwillt ein Geisterhall an und rückwärts gespielte Stücke saugen ins Wort hinein, dann kommt die Stimme, trocken und ohne Nachhall (meldet rund 0,6 s Latenz). Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über. |
 | **Effekt** | 0 % = die Stimme unbearbeitet, 100 % = der volle Klang des Modus, dazwischen fließend (Standard: 100 %). Doppelklick setzt auf 100 % zurück. |
 | **Hall** / **Echo** | Drehregler 0–200 %: 100 % = so, wie der Modus abgestimmt ist, 0 % = aus, 200 % = doppelt so viel. Im Modus Geist heißen sie **Reverse-Hall** und **Reverse-Echo**: so wählst du nur den rückwärts anschwellenden Hall, nur die rückwärts gespielten Echos oder beides. Doppelklick setzt auf 100 % zurück. |
 
@@ -66,7 +66,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 - **Latenz:** Nur im Modus **Geist** meldet das Plugin rund 0,6 s Latenz an den Host, damit der Reverse-Hall vor der Stimme
   liegen kann; die DAW gleicht das aus. Die anderen drei Modi sind latenzfrei. Weil sich die gemeldete Latenz beim
   Moduswechsel ändert, verwendest du Geist am besten auf einer eigenen Spur oder Plugin-Instanz und automatisierst den Modus
-  nicht quer durch die Szene. Hall und Echos klingen nach dem Ende der Stimme nach, im Modus Traum bis zu etwa sechs Sekunden.
+  nicht quer durch die Szene. Hall und Echos klingen nach dem Ende der Stimme nach, im Modus Traum bis zu etwa fünf Sekunden; im Modus Geist bleibt die Stimme trocken, es gibt keinen Nachhall.
   Zwischen 0 und 100 % mischen sich bearbeitete und unbearbeitete Stimme, dabei können leichte Kammfilter-Färbungen entstehen.
 - Der Eingang wird als Stereo verarbeitet; eine Mono-Spur bekommt durch die Echo-Bausteine Stereobreite.
 - Der Pegel ist fest ausgeglichen: bei 100 % ist die Stimme etwa so laut wie bei 0 % (gemessen mit einem
@@ -84,6 +84,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Sie wird bei jeder
 Änderung hochgezählt.
 
+- **1.6** – Erinnerung und Traum deutlich zurückgenommen (Echos, Hall, Echo-Wolke, Stottern und Verstimmung etwa halbiert, Pegel neu abgeglichen), damit die Stimme verständlich bleibt. Geist: der Vorwärts-Hall hinter der Stimme ist wieder weg, die Stimme bleibt trocken. Erinnerung mit leichtem Bandleiern (Airwindows Flutter), Traum mit langsam wabernder Tonhöhe (Airwindows GalacticVibe) und Echos, die schief wegdriften, damit sich Traum deutlicher von Erinnerung abhebt.
 - **1.5** – Drehregler Hall und Echo (0–200 %, 100 % = Preset); im Modus Geist zusätzlich Reverse-Echo, die Regler heißen dort Reverse-Hall und Reverse-Echo. Neuer Untertitel „Audio Drama Mindscape Simulator“, mehr Luft um das Traumfänger-Symbol.
 - **1.4** – Echter Hall in allen Modi (nach Airwindows Galactic), je Modus ein eigener Raum: winzig (Innere Stimme), kleines dumpfes Zimmer (Erinnerung), riesige dunkle Halle (Traum), Nachhall hinter der Stimme (Geist). Pegel neu abgeglichen.
 - **1.3** – Modi deutlich stärker unterschieden; neues Schwapp-Echo mit Pre-Delay (Ping-Pong, abfallend oder anschwellend) in Erinnerung und Traum; vierter Modus Geist mit echtem Reverse-Hall (Latenz nur in diesem Modus).
@@ -102,6 +103,6 @@ Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der
 ## Danke
 
 Gebaut mit [JUCE](https://juce.com) 8. Die Klangbausteine **SweetWide**, **StereoEnsemble**, **GlitchShifter**,
-**PitchNasty** und der Hall **Galactic** sind Portierungen von Airwindows-Code von Chris Johnson
+**PitchNasty**, **Flutter**, **GalacticVibe** und der Hall **Galactic** sind Portierungen von Airwindows-Code von Chris Johnson
 ([github.com/airwindows](https://github.com/airwindows/airwindows), MIT-Lizenz). Angepasst wurden nur die Struktur
 (freie Abtastrate) und die Dither-Stufe, die weggelassen ist; die Algorithmen selbst sind übernommen.

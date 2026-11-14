@@ -47,18 +47,22 @@ struct Voicing
     // Reverse-Hall (nur Geist)
     double ghostDry;     // Anteil der (verzoegerten) Stimme, die am Ende des Schwells einsetzt
     double ghostWet;     // Anteil des anschwellenden Reverse-Halls
+    // Schwimmen (Airwindows Flutter / GalacticVibe) und verstimmte Echos
+    double flutterWet;   // Anteil Flutter (unregelmaessiges Bandleiern), 0..1
+    double vibeWet;      // Anteil GalacticVibe (langsames, zufaelliges Wabern der Tonhoehe), 0..1
+    double echoDriftMs;  // Echos wandern in der Tonhoehe: Schwankung der Echo-Zeit in ms (0 = aus)
 };
 
 // Reihenfolge wie enum Mode
 static const Voicing kVoicing[kNumModes] = {
     // innere Stimme: nah, im Kopf, leicht verbreitert, nur ein kurzes leises Echo dahinter, wenig dunkler
-    { 0.00, 0.00, 0.12, 0.25, 0.35, 0.22, 140.0, 7500.0, 1.40,   0.18,  18.0,  90.0, 0.0, 0.3, 3500.0,   0.00, 0.00 },
+    { 0.00, 0.00, 0.12, 0.25, 0.35, 0.22, 140.0, 7500.0, 1.42,   0.18,  18.0,  90.0, 0.0, 0.3, 3500.0,   0.00, 0.00,   0.00, 0.00, 0.0 },
     // Erinnerung: stark zerfallende, dumpfe Stimme, dazu Pre-Delay und Echos, die schwappend zwischen links und rechts anschwellen
-    { 0.85, 0.00, 0.20, 0.20, 0.55, 0.30, 260.0, 3800.0, 1.95,   0.55, 120.0, 240.0, 0.7, 1.0, 2600.0,   0.00, 0.00 },
+    { 0.55, 0.00, 0.20, 0.20, 0.55, 0.15, 260.0, 3800.0, 2.88,   0.28, 120.0, 240.0, 0.7, 1.0, 2600.0,   0.00, 0.00,   1.00, 0.00, 0.0 },
     // Traum: koernig verstimmt, weite Wolke, dazu langsam anschwellende Echos
-    { 0.00, 0.75, 0.20, 0.30, 0.90, 0.60, 160.0, 4200.0, 1.50,   0.40,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00 },
+    { 0.00, 0.45, 0.20, 0.30, 0.90, 0.30, 160.0, 4200.0, 3.69,   0.20,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00,   0.00, 0.50, 5.0 },
     // Geist: der Hall laeuft rueckwaerts und schwillt vor der Stimme an (Latenz, siehe kGhostSeconds)
-    { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 0.78,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95 },
+    { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 0.92,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95,   0.00, 0.00, 0.0 },
 };
 
 // Tap-Verlauf der Schwapp-Echos (8 Echos): abfallend bzw. anschwellend, Mischung ueber echoSwell
@@ -83,9 +87,11 @@ constexpr double kNastyFeedback = 0.25;     // Rueckkopplung 0..1
 struct Room { double level, replace, bright, detune, size; };
 static const Room kRoom[kNumModes] = {
     { 0.35, 0.88, 0.55, 0.00, 0.06 },   // Innere Stimme: winzig, eng, nur ein Hauch Raum im Kopf
-    { 1.45, 0.62, 0.28, 0.15, 0.30 },   // Erinnerung: kleines, dumpfes, altes Zimmer
-    { 1.57, 0.72, 0.32, 0.70, 1.00 },   // Traum: riesig, dunkel, schwebend
-    { 0.96, 0.65, 0.40, 0.35, 0.55 } }; // Geist: Nachhall hinter der Stimme
+    { 0.72, 0.62, 0.28, 0.15, 0.30 },   // Erinnerung: kleines, dumpfes, altes Zimmer
+    { 0.78, 0.72, 0.32, 0.70, 1.00 },   // Traum: riesig, dunkel, schwebend
+    { 0.00, 0.65, 0.40, 0.35, 0.55 } }; // Geist: kein Vorwaerts-Hall, nur Reverse (die Stimme bleibt trocken)
+constexpr double kFlutterAmount = 0.45;   // Airwindows-Flutter: Tiefe des Bandleierns
+constexpr double kVibeDrift = 0.55;       // Airwindows-GalacticVibe: Geschwindigkeit des Waberns
 constexpr double kSmoothSeconds = 0.060;    // Zeit, in der Moduswechsel ueberblendet werden
 
 // ======================================================================================================
@@ -508,6 +514,102 @@ private:
 };
 
 // ======================================================================================================
+//  Flutter (Airwindows, MIT): unregelmaessiges Bandleiern. Portiert ohne Dither, Tiefe/Geschwindigkeit skaliert mit der Abtastrate.
+// ======================================================================================================
+class Flutter
+{
+public:
+    void prepare (double sampleRate, double amount)
+    {
+        const double scale = sampleRate / 44100.0;
+        depth = amount * amount * scale * 70.0;
+        trim = (0.0024 * amount * amount) / scale;
+        reset();
+    }
+    void reset()
+    {
+        for (int c = 0; c < 2; ++c) std::fill (d[c], d[c] + 1000, 0.0);
+        gcount = 999; sweep = 3.141592653589793 * 2.0; rateof = 0.5; nextmax = 0.5;
+    }
+    void process (double& l, double& r)
+    {
+        if (gcount < 0 || gcount > 999) gcount = 999;
+        d[0][gcount] = l; d[1][gcount] = r;
+        const double offset = depth + depth * rateof * rateof * std::sin (sweep);
+        const int whole = (int) std::floor (offset);
+        const double frac = offset - whole;
+        int c0 = gcount + whole; if (c0 > 999) c0 -= 1000;
+        int c1 = gcount + whole + 1; if (c1 > 999) c1 -= 1000;
+        l = d[0][c0] * (1.0 - frac) + d[0][c1] * frac;
+        r = d[1][c0] * (1.0 - frac) + d[1][c1] * frac;
+        rateof = rateof * (1.0 - trim) + nextmax * trim;
+        sweep += rateof * trim;
+        if (sweep >= 6.283185307179586)
+        {
+            sweep -= 3.141592653589793;
+            rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+            nextmax = 0.24 + ((double) rng / 4294967295.0) * 0.74;
+        }
+        --gcount;
+    }
+private:
+    double d[2][1000] {};
+    int gcount = 999;
+    double depth = 0.0, trim = 0.0, sweep = 6.283185307179586, rateof = 0.5, nextmax = 0.5;
+    uint32_t rng = 0x1234567u;
+};
+
+// ======================================================================================================
+//  GalacticVibe (Airwindows, MIT): langsames, zufaelliges Wabern der Tonhoehe ueber einen kurzen schwebenden Vorlauf
+// ======================================================================================================
+class GalacticVibe
+{
+public:
+    void prepare (double sampleRate, double drift)
+    {
+        scale = sampleRate / 44100.0;
+        delayM = std::max (8, (int) std::lround (256.0 * scale));
+        driftK = std::pow (drift, 3.0) * 0.001 / scale;
+        for (int c = 0; c < 2; ++c) buf[c].assign ((size_t) delayM + 2, 0.0);
+        reset();
+    }
+    void reset()
+    {
+        for (int c = 0; c < 2; ++c) std::fill (buf[c].begin(), buf[c].end(), 0.0);
+        countM = 1; vibM = 3.0; oldfpd = 0.5;
+    }
+    void process (double& l, double& r)
+    {
+        vibM += oldfpd * driftK;
+        if (vibM > 6.283185307179586)
+        {
+            vibM = 0.0;
+            rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+            oldfpd = 0.4294967295 + (double) rng * 0.0000000000618;
+        }
+        buf[0][(size_t) countM] = l; buf[1][(size_t) countM] = r;
+        if (++countM > delayM) countM = 0;
+        const double half = 0.5 * delayM;
+        double out[2];
+        for (int c = 0; c < 2; ++c)
+        {
+            const double off = (std::sin (vibM + (c ? 1.5707963267948966 : 0.0)) + 1.0) * half;
+            const int w = countM + (int) off;
+            const double frac = off - std::floor (off);
+            const int i0 = w > delayM ? w - (delayM + 1) : w;
+            const int i1 = (w + 1) > delayM ? w + 1 - (delayM + 1) : w + 1;
+            out[c] = buf[c][(size_t) i0] * (1.0 - frac) + buf[c][(size_t) i1] * frac;
+        }
+        l = out[0]; r = out[1];
+    }
+private:
+    std::vector<double> buf[2];
+    double scale = 1.0, driftK = 0.0, vibM = 3.0, oldfpd = 0.5;
+    int delayM = 256, countM = 1;
+    uint32_t rng = 0x7654321u;
+};
+
+// ======================================================================================================
 //  Verzoegerungsring (feste Laenge, Rueckgabe = Wert von vor genau n Samples)
 // ======================================================================================================
 struct Ring
@@ -686,6 +788,7 @@ public:
         smooth = 1.0 - std::exp (-1.0 / (kSmoothSeconds * sr));
         fader = 1.0 - std::exp (-1.0 / (0.020 * sr));
         ens.prepare (sr); glitch.prepare (sr); nasty.prepare (sr);
+        flutter.prepare (sr, kFlutterAmount); vibe.prepare (sr, kVibeDrift);
         int n = 1; while ((double) n < 3.4 * sr) n <<= 1;
         echoBuf.assign ((size_t) n, 0.0); echoMask = n - 1; echoPos = 0;
         swell.prepare (sr);
@@ -703,7 +806,7 @@ public:
     }
     void reset()
     {
-        ens.reset(); glitch.reset(); nasty.reset(); swell.reset();
+        ens.reset(); glitch.reset(); nasty.reset(); swell.reset(); flutter.reset(); vibe.reset();
         for (auto& f : hp) f.clear();
         for (auto& f : lp) f.clear();
         std::fill (echoBuf.begin(), echoBuf.end(), 0.0);
@@ -735,6 +838,8 @@ public:
             cur.highpassHz += (v.highpassHz - cur.highpassHz) * smooth;
             cur.lowpassHz += (v.lowpassHz - cur.lowpassHz) * smooth;
             cur.trim += (v.trim - cur.trim) * smooth;
+            cur.flutterWet += (v.flutterWet - cur.flutterWet) * smooth;
+            cur.vibeWet += (v.vibeWet - cur.vibeWet) * smooth;
             amount += (dream - amount) * fader;
             hallK += (hall - hallK) * fader;
             echoK += (echo - echoK) * fader;
@@ -766,6 +871,18 @@ public:
             l = l * (1.0 - cur.nastyWet) + nl * cur.nastyWet;
             r = r * (1.0 - cur.nastyWet) + nr * cur.nastyWet;
 
+            // 1b. Schwimmen: Bandleiern (Erinnerung) und langsames Wabern der Tonhoehe (Traum)
+            {
+                double fl = l, fr = r;
+                flutter.process (fl, fr);
+                l = l * (1.0 - cur.flutterWet) + fl * cur.flutterWet;
+                r = r * (1.0 - cur.flutterWet) + fr * cur.flutterWet;
+                double vl = l, vr = r;
+                vibe.process (vl, vr);
+                l = l * (1.0 - cur.vibeWet) + vl * cur.vibeWet;
+                r = r * (1.0 - cur.vibeWet) + vr * cur.vibeWet;
+            }
+
             // 2. Schwapp-Echo: Pre-Delay, dann Ping-Pong-Echos (abfallend oder anschwellend)
             const double mono = 0.5 * (l + r);
             echoBuf[(size_t) (echoPos & echoMask)] = mono;
@@ -777,7 +894,19 @@ public:
                 {
                     const double g = kEchoDecay[k - 1] * (1.0 - ev.echoSwell) + kEchoSwell[k - 1] * ev.echoSwell;
                     const double other = g * (1.0 - ev.echoWidth);
-                    const double t = echoBuf[(size_t) ((echoPos - echoPre - k * echoSpace) & echoMask)];
+                    double t;
+                    if (echoDrift > 0.0)
+                    {
+                        // jede Wiederholung wandert langsam und eigenstaendig in der Tonhoehe
+                        const double dly = (double) (echoPre + k * echoSpace) + echoDrift * std::sin (echoPh[k]);
+                        echoPh[k] += echoRate[k];
+                        const double fd = std::floor (dly);
+                        const double fr = dly - fd;
+                        const int n0 = echoPos - (int) fd;
+                        t = echoBuf[(size_t) (n0 & echoMask)] * (1.0 - fr) + echoBuf[(size_t) ((n0 - 1) & echoMask)] * fr;
+                    }
+                    else
+                        t = echoBuf[(size_t) ((echoPos - echoPre - k * echoSpace) & echoMask)];
                     if (k & 1) { eL += g * t; eR += other * t; }
                     else       { eR += g * t; eL += other * t; }
                 }
@@ -872,6 +1001,8 @@ private:
         echoPre = std::max (1, (int) std::lround (ev.echoPreMs * 0.001 * sr));
         echoSpace = std::max (1, (int) std::lround (ev.echoSpaceMs * 0.001 * sr));
         echoCoef = 1.0 - std::exp (-2.0 * 3.14159265358979323846 * ev.echoLpHz / sr);
+        echoDrift = ev.echoDriftMs * 0.001 * sr;
+        for (int k = 1; k <= 8; ++k) echoRate[k] = 2.0 * 3.14159265358979323846 * (0.11 + 0.043 * k) / sr;
     }
     void snapToMode (int m)
     {
@@ -894,6 +1025,10 @@ private:
     Voicing cur = kVoicing[kInner];
     StereoEnsemble ens;
     GlitchShifter glitch;
+    Flutter flutter;
+    GalacticVibe vibe;
+    double echoPh[9] {}, echoRate[9] {};
+    double echoDrift = 0.0;
     PitchNasty nasty;
     Biquad hp[2], lp[2];
     // Echo
