@@ -18,6 +18,12 @@ merkt: Das ist jetzt nicht die Szene, das ist im Kopf. Bisher habe ich das jedes
 zusammengebaut. DREAMCATCHER legt diese Behandlung mit einem Klick auf die Spur und lässt sich über die Zeit
 ein- und ausblenden, zum Beispiel wenn eine alte Stimme aus einer Überblendung in der Rückblende auftaucht.
 
+DREAMCATCHER soll niemandem die Erfahrung abnehmen, solche Szenen selbst zu gestalten. Gerade am Anfang kann es viel
+Spaß machen und lehrreich sein, eine Traum- oder Erinnerungsstimme selbst aufzubauen und zu hören, wie Verstimmung,
+Echo, Filter und Automation ineinandergreifen. Ich bin dankbar, dass ich diesen Weg selbst gegangen bin, auch wenn er
+manchmal umständlich und mühselig war. Gerade dadurch weiß ich, was ich mir von einem Werkzeug wünsche, das all das in
+einem vereint. DREAMCATCHER soll das Gestalten nicht ersetzen, sondern die technische Umsetzung im Alltag einfacher machen.
+
 Der Klang jedes Modus ist fest abgestimmt. Es gibt keinen Ausgangsregler, und es werden keine eigenen Geräusche
 dazugemischt: Das Plugin verändert nur den Klang der Stimme.
 
@@ -71,6 +77,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Sie wird bei jeder
 Änderung hochgezählt.
 
+- **1.1** – README um den Absatz „Gestalten nicht ersetzen“ ergänzt.
 - **1.0** – Erste Version: Modi Innere Stimme, Erinnerung und Traum, Effekt-Fader 0–100 %, Oberfläche im Stil von
   LOCATIONS und RADIOPHONE mit Hilfe, Hell/Dunkel und skalierbarem Fenster.
 
