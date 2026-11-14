@@ -21,7 +21,7 @@ public:
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    double getTailLengthSeconds() const override { return 3.0; }   // Schwapp-Echos klingen bis zu ca. 3 s nach
+    double getTailLengthSeconds() const override { return 6.0; }   // Traum-Hall und Echos klingen bis zu ca. 6 s nach
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }

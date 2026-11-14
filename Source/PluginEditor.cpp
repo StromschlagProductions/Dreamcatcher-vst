@@ -13,16 +13,16 @@ juce::String modeDescription (int m)
     switch (m)
     {
         case dch::kInner:
-            return u8 ("Die Stimme rückt ins Innere des Kopfes: schmal, nah, ein kurzer Hauch Echo, die Höhen etwas weicher, die Tiefen weg. "
+            return u8 ("Die Stimme rückt ins Innere des Kopfes: schmal, nah, ein winziger, enger Raum und ein Hauch Echo, die Höhen weicher, die Tiefen weg. "
                        "Für Gedanken und die Stimme im Kopf einer Figur.");
         case dch::kMemory:
-            return u8 ("Die Stimme zerfällt: Sie stottert, sinkt ab, klingt dünn und dumpf. Nach einem Pre-Delay schwappen Echos von links nach rechts "
-                       "heran und schwellen an, wop, wop. Für Rückblenden, zum Beispiel die alte Stimme, die aus einer Überblendung kommt.");
+            return u8 ("Die Stimme zerfällt: Sie stottert, sinkt ab, klingt dünn und dumpf wie in einem alten Zimmer. Nach einem Pre-Delay schwappen Echos "
+                       "von links nach rechts heran, wop, wop. Für Rückblenden, zum Beispiel die alte Stimme, die aus einer Überblendung kommt.");
         case dch::kDream:
-            return u8 ("Die Stimme ist körnig verstimmt und in eine weite, dunkle Wolke aus Echos gehüllt, die langsam heranschwillt "
-                       "und schwebend wieder abtaucht. Für Träume, Fieber und Halbschlaf.");
+            return u8 ("Die Stimme ist körnig verstimmt und liegt in einem riesigen, dunklen, schwebenden Hall mit einer Echo-Wolke, "
+                       "die langsam heranschwillt. Für Träume, Fieber und Halbschlaf.");
         default:
-            return u8 ("Reverse-Hall: Vor jedem Wort schwillt ein Geisterhall an, dann kommt die Stimme. Das Plugin meldet dafür rund 0,6 s Latenz, die "
+            return u8 ("Reverse-Hall: Vor jedem Wort schwillt ein Geisterhall an, dann kommt die Stimme und hallt nach. Das Plugin meldet dafür rund 0,6 s Latenz, die "
                        "die DAW ausgleicht. Für Geister und Erscheinungen. Am besten auf einer eigenen Spur oder Plugin-Instanz.");
     }
 }
@@ -60,11 +60,11 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
           "Der Klang jedes Modus ist fest abgestimmt, es gibt nichts zu basteln. Es gibt nur zwei Regler: den Modus und den Effekt-Fader.");
 
     head ("MODUS");
-    body ("Innere Stimme: Die Stimme rückt ins Innere des Kopfes. Schmal und nah, ein kurzer Hauch Echo, Höhen weicher, Tiefen weg.");
-    body ("Erinnerung: Die Stimme stottert, sinkt ab, klingt dünn und dumpf. Nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts "
+    body ("Innere Stimme: Die Stimme rückt ins Innere des Kopfes. Schmal und nah, ein winziger, enger Raum, ein Hauch Echo, Höhen weicher, Tiefen weg.");
+    body ("Erinnerung: Die Stimme stottert, sinkt ab, klingt dünn und dumpf in einem kleinen, alten Zimmer. Nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts "
           "heran und schwellen an (wop, wop). Gedacht für Rückblenden.");
-    body ("Traum: Körnig verstimmt, in einer weiten, dunklen Wolke aus Echos, die langsam anschwillt und schwebend abtaucht.");
-    body ("Geist: Echter Reverse-Hall. Vor jedem Wort schwillt ein Geisterhall an, dann erst kommt die Stimme. Dafür muss das Plugin die Stimme "
+    body ("Traum: Körnig verstimmt, in einem riesigen, dunklen, leicht schwebenden Hall und einer Echo-Wolke, die langsam anschwillt.");
+    body ("Geist: Echter Reverse-Hall. Vor jedem Wort schwillt ein Geisterhall an, dann erst kommt die Stimme, danach hallt sie normal nach. Dafür muss das Plugin die Stimme "
           "um rund 0,6 Sekunden verzögern und meldet diese Latenz dem Host; die DAW gleicht sie aus, sodass der Schwell hörbar VOR der Stimme liegt.");
     body ("Der Modus lässt sich automatisieren. Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über, es knackt nicht.");
 
@@ -77,7 +77,7 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
     head ("Allgemein");
     body ("Latenz: Nur im Modus Geist meldet das Plugin rund 0,6 s Latenz an den Host, in den anderen drei Modi ist es latenzfrei. Weil sich die gemeldete "
           "Latenz beim Moduswechsel ändert, nimm Geist am besten auf einer eigenen Spur oder Plugin-Instanz und automatisiere den Modus nicht quer durch die Szene. "
-          "Nach dem Ende der Stimme klingen die Echos bis zu etwa drei Sekunden nach.");
+          "Nach dem Ende der Stimme klingen Hall und Echos nach, im Modus Traum bis zu etwa sechs Sekunden.");
     body ("Doppelklick auf den Fader setzt ihn auf 100 % zurück. Look: Dunkel / Hell, das Fenster ist am rechten unteren Rand skalierbar (50–300 %), "
           "beides wird mit dem Projekt gespeichert.");
     body ("Auch auf einem Bus: Du kannst Dreamcatcher auf einen Gruppenkanal legen, damit die Stimme und die Geräusche einer Traum- oder "
@@ -87,7 +87,7 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
 
     head ("Idee und Konzept");
     body ("Lars Eickstädt, Stromschlag Audio");
-    note ("Gebaut mit JUCE. Die Klangbausteine SweetWide, StereoEnsemble, GlitchShifter und PitchNasty sind Portierungen von Airwindows-Code "
+    note ("Gebaut mit JUCE. Die Klangbausteine SweetWide, StereoEnsemble, GlitchShifter, PitchNasty und der Hall Galactic sind Portierungen von Airwindows-Code "
           "(Chris Johnson, MIT-Lizenz).");
     return s;
 }
@@ -322,7 +322,7 @@ void DreamcatcherEditor::paint (juce::Graphics& g)
     card (12.0f, 298.0f, (float) W - 24.0f, 110.0f, modeShort (m));
     g.setColour (theme.text);
     g.setFont (juce::FontOptions (13.0f));
-    g.drawFittedText (modeDescription (m), 24, 322, W - 48, 78, juce::Justification::topLeft, 4);
+    g.drawFittedText (modeDescription (m), 24, 322, W - 48, 78, juce::Justification::topLeft, 4, 1.0f);
 }
 
 void DreamcatcherEditor::resized()

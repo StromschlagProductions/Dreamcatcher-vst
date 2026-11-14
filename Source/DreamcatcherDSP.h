@@ -52,13 +52,13 @@ struct Voicing
 // Reihenfolge wie enum Mode
 static const Voicing kVoicing[kNumModes] = {
     // innere Stimme: nah, im Kopf, leicht verbreitert, nur ein kurzes leises Echo dahinter, wenig dunkler
-    { 0.00, 0.00, 0.12, 0.25, 0.35, 0.22, 140.0, 7500.0, 1.25,   0.18,  18.0,  90.0, 0.0, 0.3, 3500.0,   0.00, 0.00 },
+    { 0.00, 0.00, 0.12, 0.25, 0.35, 0.22, 140.0, 7500.0, 1.40,   0.18,  18.0,  90.0, 0.0, 0.3, 3500.0,   0.00, 0.00 },
     // Erinnerung: stark zerfallende, dumpfe Stimme, dazu Pre-Delay und Echos, die schwappend zwischen links und rechts anschwellen
-    { 0.85, 0.00, 0.20, 0.20, 0.55, 0.30, 260.0, 3800.0, 2.00,   0.55, 120.0, 240.0, 0.7, 1.0, 2600.0,   0.00, 0.00 },
+    { 0.85, 0.00, 0.20, 0.20, 0.55, 0.30, 260.0, 3800.0, 1.95,   0.55, 120.0, 240.0, 0.7, 1.0, 2600.0,   0.00, 0.00 },
     // Traum: koernig verstimmt, weite Wolke, dazu langsam anschwellende Echos
-    { 0.00, 0.75, 0.20, 0.30, 0.90, 0.60, 160.0, 4200.0, 1.80,   0.40,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00 },
+    { 0.00, 0.75, 0.20, 0.30, 0.90, 0.60, 160.0, 4200.0, 1.50,   0.40,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00 },
     // Geist: der Hall laeuft rueckwaerts und schwillt vor der Stimme an (Latenz, siehe kGhostSeconds)
-    { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 1.00,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95 },
+    { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 0.82,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95 },
 };
 
 // Tap-Verlauf der Schwapp-Echos (8 Echos): abfallend bzw. anschwellend, Mischung ueber echoSwell
@@ -77,6 +77,13 @@ constexpr double kGlitchFeedback = 0.10;    // Rueckkopplung 0..0.67
 constexpr double kNastyBendSemis = -0.45;   // Verstimmung in Halbtoenen
 constexpr double kNastyGrindSemis = -20.0;  // Koernung: Halbtoene unter dem mittleren C (tiefer = groeber)
 constexpr double kNastyFeedback = 0.25;     // Rueckkopplung 0..1
+// Hall je Modus (Airwindows Galactic): Pegel, Ausklang (Replace: hoch = kurz), Helligkeit, Schwebung, Raumgroesse
+struct Room { double level, replace, bright, detune, size; };
+static const Room kRoom[kNumModes] = {
+    { 0.35, 0.88, 0.55, 0.00, 0.06 },   // Innere Stimme: winzig, eng, nur ein Hauch Raum im Kopf
+    { 1.45, 0.62, 0.28, 0.15, 0.30 },   // Erinnerung: kleines, dumpfes, altes Zimmer
+    { 1.57, 0.72, 0.32, 0.70, 1.00 },   // Traum: riesig, dunkel, schwebend
+    { 0.96, 0.65, 0.40, 0.35, 0.55 } }; // Geist: Nachhall hinter der Stimme
 constexpr double kSmoothSeconds = 0.060;    // Zeit, in der Moduswechsel ueberblendet werden
 
 // ======================================================================================================
@@ -383,6 +390,122 @@ struct Biquad
 };
 
 // ======================================================================================================
+//  Galactic (Airwindows, Chris Johnson, MIT): Hall aus drei 4x4-Rueckkopplungsnetzen mit schwebendem Vorlauf
+//  Portiert ohne Dither. Die Raumgroesse wird beim prepare() fest eingestellt (jeder Modus hat sein eigenes Exemplar).
+// ======================================================================================================
+class Galactic
+{
+public:
+    void prepare (double sampleRate, const Room& room)
+    {
+        const double overall = sampleRate / 44100.0;
+        cycleEnd = std::max (1, std::min (4, (int) std::floor (overall)));
+        regen = 0.0625 + (1.0 - room.replace) * 0.0625;
+        attenuate = (1.0 - regen / 0.125) * 1.333;
+        lowpass = std::pow (1.00001 - (1.0 - room.bright), 2.0) / std::sqrt (overall);
+        drift = std::pow (room.detune, 3.0) * 0.001;
+        const double size = room.size * 1.77 + 0.1;
+        static const double base[12] = { 3407, 1823, 859, 331, 4801, 2909, 1153, 461, 7607, 4217, 2269, 1597 };
+        for (int k = 0; k < 12; ++k)
+        {
+            d[k] = std::max (1, (int) (base[k] * size));
+            for (int c = 0; c < 2; ++c) buf[c][k].assign ((size_t) d[k] + 2, 0.0);
+        }
+        for (int c = 0; c < 2; ++c) bufM[c].assign ((size_t) kDelayM + 2, 0.0);
+        reset();
+    }
+    void reset()
+    {
+        for (int c = 0; c < 2; ++c)
+        {
+            for (auto& b : buf[c]) std::fill (b.begin(), b.end(), 0.0);
+            std::fill (bufM[c].begin(), bufM[c].end(), 0.0);
+            for (auto& f : fb[c]) f = 0.0;
+            for (auto& r : lastRef[c]) r = 0.0;
+            iirA[c] = iirB[c] = 0.0;
+        }
+        for (auto& n : count) n = 1;
+        countM = 1; cycle = 0; vibM = 3.0; oldfpd = 0.5;
+    }
+    // Eingang l/r, Rueckgabe: nur der Hall (wet)
+    void process (double inL, double inR, double& outL, double& outR)
+    {
+        vibM += oldfpd * drift;
+        if (vibM > 6.283185307179586) { vibM = 0.0; rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; oldfpd = 0.4294967295 + rng * 0.0000000000618; }
+
+        bufM[0][(size_t) countM] = inL * attenuate;
+        bufM[1][(size_t) countM] = inR * attenuate;
+        if (++countM > kDelayM) countM = 0;
+        double x[2];
+        for (int c = 0; c < 2; ++c)
+        {
+            const double off = (std::sin (vibM + (c ? 1.5707963267948966 : 0.0)) + 1.0) * 127.0;
+            const int w = countM + (int) off;
+            const double frac = off - std::floor (off);
+            const int i0 = w > kDelayM ? w - (kDelayM + 1) : w;
+            const int i1 = (w + 1) > kDelayM ? w + 1 - (kDelayM + 1) : w + 1;
+            x[c] = bufM[c][(size_t) i0] * (1.0 - frac) + bufM[c][(size_t) i1] * frac;
+            iirA[c] = iirA[c] * (1.0 - lowpass) + x[c] * lowpass;
+            x[c] = iirA[c];
+        }
+
+        if (++cycle == cycleEnd)
+        {
+            double o[2][4];
+            // erster Block: Eingang + ueberkreuzte Rueckkopplung
+            for (int c = 0; c < 2; ++c)
+                for (int k = 0; k < 4; ++k)
+                    buf[c][k][(size_t) count[k]] = x[c] + fb[1 - c][k] * regen;
+            for (int k = 0; k < 4; ++k) advance (k);
+            for (int c = 0; c < 2; ++c) for (int k = 0; k < 4; ++k) o[c][k] = tap (c, k);
+            // zweiter und dritter Block
+            for (int stage = 1; stage <= 2; ++stage)
+            {
+                const int b0 = stage * 4;
+                for (int c = 0; c < 2; ++c)
+                    for (int k = 0; k < 4; ++k)
+                        buf[c][b0 + k][(size_t) count[b0 + k]] = householder (o[c], k);
+                for (int k = 0; k < 4; ++k) advance (b0 + k);
+                for (int c = 0; c < 2; ++c) for (int k = 0; k < 4; ++k) o[c][k] = tap (c, b0 + k);
+            }
+            for (int c = 0; c < 2; ++c)
+            {
+                for (int k = 0; k < 4; ++k) fb[c][k] = householder (o[c], k);
+                const double y = (o[c][0] + o[c][1] + o[c][2] + o[c][3]) / 8.0;
+                double* r = lastRef[c];
+                if (cycleEnd == 4) { r[0] = r[4]; r[2] = (r[0] + y) / 2; r[1] = (r[0] + r[2]) / 2; r[3] = (r[2] + y) / 2; r[4] = y; }
+                else if (cycleEnd == 3) { r[0] = r[3]; r[2] = (r[0] + r[0] + y) / 3; r[1] = (r[0] + y + y) / 3; r[3] = y; }
+                else if (cycleEnd == 2) { r[0] = r[2]; r[1] = (r[0] + y) / 2; r[2] = y; }
+                else r[0] = y;
+            }
+            cycle = 0;
+        }
+        for (int c = 0; c < 2; ++c)
+        {
+            iirB[c] = iirB[c] * (1.0 - lowpass) + lastRef[c][cycle] * lowpass;
+            x[c] = iirB[c];
+        }
+        outL = x[0]; outR = x[1];
+    }
+
+private:
+    static constexpr int kDelayM = 256;
+    static double householder (const double* o, int k) { return o[k] - (o[0] + o[1] + o[2] + o[3] - o[k]); }
+    void advance (int k) { if (++count[k] > d[k]) count[k] = 0; }
+    double tap (int c, int k) const
+    {
+        const int n = count[k];
+        return buf[c][k][(size_t) (n > d[k] ? n - d[k] - 1 : n)];
+    }
+
+    std::vector<double> buf[2][12], bufM[2];
+    int d[12] {}, count[12] {}, countM = 1, cycle = 0, cycleEnd = 1;
+    double fb[2][4] {}, lastRef[2][7] {}, iirA[2] {}, iirB[2] {};
+    double regen = 0.09, attenuate = 0.5, lowpass = 0.5, drift = 0.0, vibM = 3.0, oldfpd = 0.5;
+    uint32_t rng = 0x2545F491u;
+};
+
+// ======================================================================================================
 //  Verzoegerungsring (feste Laenge, Rueckgabe = Wert von vor genau n Samples)
 // ======================================================================================================
 struct Ring
@@ -529,12 +652,13 @@ private:
             {
                 const Cx* x = &X[(size_t) ((head - p + parts) % parts) * F];
                 const Cx* h = &H[c][(size_t) p * F];
-                for (int k = 0; k < F; ++k)
+                for (int k = 0; k <= F / 2; ++k)   // reelle Signale: obere Haelfte ist gespiegelt
                 {
                     acc[k].r += x[k].r * h[k].r - x[k].i * h[k].i;
                     acc[k].i += x[k].r * h[k].i + x[k].i * h[k].r;
                 }
             }
+            for (int k = 1; k < F / 2; ++k) acc[F - k] = { acc[k].r, -acc[k].i };
             fft (acc, true);
             for (int i = 0; i < B; ++i) out[c][i] = acc[B + i].r;
         }
@@ -563,6 +687,7 @@ public:
         int n = 1; while ((double) n < 3.4 * sr) n <<= 1;
         echoBuf.assign ((size_t) n, 0.0); echoMask = n - 1; echoPos = 0;
         swell.prepare (sr);
+        for (int m = 0; m < kNumModes; ++m) room[m].prepare (sr, kRoom[m]);
         ghostDelay = swell.latency();
         for (auto* r : { &dlL, &dlR, &dryL, &dryR }) r->init (ghostDelay);
         reset();
@@ -577,6 +702,7 @@ public:
         echoLpL = echoLpR = 0.0;
         for (auto* r : { &dlL, &dlR, &dryL, &dryR }) r->clear();
         ghostRunning = false;
+        for (int m = 0; m < kNumModes; ++m) { room[m].reset(); roomRunning[m] = false; }
     }
     void setMode (int m) { mode = std::max (0, std::min (kNumModes - 1, m)); }
     // Latenz, die dem Host gemeldet werden muss: nur im Modus Geist (Schwell liegt VOR der Stimme)
@@ -678,7 +804,27 @@ public:
                 if (ghostTarget == 0.0 && ghostAmt < 0.0005) ghostRunning = false;
             }
 
-            // 6. Fader: unbearbeitet <-> voller Effekt
+            // 6. Hall: jeder Modus hat seinen eigenen Raum; beim Wechsel klingt der alte aus, der neue blendet ein
+            {
+                double hl = 0.0, hr = 0.0;
+                for (int m = 0; m < kNumModes; ++m)
+                {
+                    const double target = m == mode ? kRoom[m].level : 0.0;
+                    roomLevel[m] += (target - roomLevel[m]) * smooth;
+                    if (! roomRunning[m])
+                    {
+                        if (target == 0.0) continue;
+                        room[m].reset(); roomRunning[m] = true;
+                    }
+                    double wl, wr;
+                    room[m].process (l, r, wl, wr);
+                    hl += wl * roomLevel[m]; hr += wr * roomLevel[m];
+                    if (target == 0.0 && roomLevel[m] < 0.0005) roomRunning[m] = false;
+                }
+                l += hl; r += hr;
+            }
+
+            // 7. Fader: unbearbeitet <-> voller Effekt
             l = safe (outDryL * (1.0 - amount) + l * amount);
             r = safe (outDryR * (1.0 - amount) + r * amount);
             left[i] = (float) l;
@@ -710,6 +856,7 @@ private:
         setEchoMode (std::max (0, std::min (kNumModes - 1, m)));
         echoLevel = kVoicing[echoMode].echoLevel;
         ghostAmt = m == kGhost ? 1.0 : 0.0;
+        for (int k = 0; k < kNumModes; ++k) roomLevel[k] = k == m ? kRoom[k].level : 0.0;
         amount = 1.0;
         started = false;
     }
@@ -729,6 +876,10 @@ private:
     double echoLevel = 0.0, echoCoef = 0.1, echoLpL = 0.0, echoLpR = 0.0;
     // Geist
     SwellConvolver swell;
+    // Hall
+    Galactic room[kNumModes];
+    double roomLevel[kNumModes] {};
+    bool roomRunning[kNumModes] {};
     Ring dlL, dlR, dryL, dryR;
     int ghostDelay = 1;
 };
