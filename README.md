@@ -84,6 +84,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Sie wird bei jeder
 Änderung hochgezählt.
 
+- **1.7** – Erinnerung mit stärkerem Bandleiern; Traum mit stärkerem Wabern, breiter und mit größerem, stärker schwebendem Hall. Pegelausgleich jetzt nach gehörrichtiger Lautheit (LU) an einem stimmähnlichen Signal gemessen.
 - **1.6** – Erinnerung und Traum deutlich zurückgenommen (Echos, Hall, Echo-Wolke, Stottern und Verstimmung etwa halbiert, Pegel neu abgeglichen), damit die Stimme verständlich bleibt. Geist: der Vorwärts-Hall hinter der Stimme ist wieder weg, die Stimme bleibt trocken. Erinnerung mit leichtem Bandleiern (Airwindows Flutter), Traum mit langsam wabernder Tonhöhe (Airwindows GalacticVibe) und Echos, die schief wegdriften, damit sich Traum deutlicher von Erinnerung abhebt.
 - **1.5** – Drehregler Hall und Echo (0–200 %, 100 % = Preset); im Modus Geist zusätzlich Reverse-Echo, die Regler heißen dort Reverse-Hall und Reverse-Echo. Neuer Untertitel „Audio Drama Mindscape Simulator“, mehr Luft um das Traumfänger-Symbol.
 - **1.4** – Echter Hall in allen Modi (nach Airwindows Galactic), je Modus ein eigener Raum: winzig (Innere Stimme), kleines dumpfes Zimmer (Erinnerung), riesige dunkle Halle (Traum), Nachhall hinter der Stimme (Geist). Pegel neu abgeglichen.

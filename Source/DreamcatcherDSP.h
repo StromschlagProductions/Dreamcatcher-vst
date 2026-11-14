@@ -56,13 +56,13 @@ struct Voicing
 // Reihenfolge wie enum Mode
 static const Voicing kVoicing[kNumModes] = {
     // innere Stimme: nah, im Kopf, leicht verbreitert, nur ein kurzes leises Echo dahinter, wenig dunkler
-    { 0.00, 0.00, 0.12, 0.25, 0.35, 0.22, 140.0, 7500.0, 1.42,   0.18,  18.0,  90.0, 0.0, 0.3, 3500.0,   0.00, 0.00,   0.00, 0.00, 0.0 },
+    { 0.00, 0.00, 0.12, 0.25, 0.35, 0.22, 140.0, 7500.0, 1.47,   0.18,  18.0,  90.0, 0.0, 0.3, 3500.0,   0.00, 0.00,   0.00, 0.00, 0.0 },
     // Erinnerung: stark zerfallende, dumpfe Stimme, dazu Pre-Delay und Echos, die schwappend zwischen links und rechts anschwellen
-    { 0.55, 0.00, 0.20, 0.20, 0.55, 0.15, 260.0, 3800.0, 2.88,   0.28, 120.0, 240.0, 0.7, 1.0, 2600.0,   0.00, 0.00,   1.00, 0.00, 0.0 },
+    { 0.55, 0.00, 0.20, 0.20, 0.55, 0.15, 260.0, 3800.0, 2.96,   0.28, 120.0, 240.0, 0.7, 1.0, 2600.0,   0.00, 0.00,   1.00, 0.00, 0.0 },
     // Traum: koernig verstimmt, weite Wolke, dazu langsam anschwellende Echos
-    { 0.00, 0.45, 0.20, 0.30, 0.90, 0.30, 160.0, 4200.0, 3.69,   0.20,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00,   0.00, 0.50, 5.0 },
+    { 0.00, 0.45, 0.28, 0.40, 0.90, 0.30, 160.0, 4200.0, 4.48,   0.20,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00,   0.00, 0.80, 5.0 },
     // Geist: der Hall laeuft rueckwaerts und schwillt vor der Stimme an (Latenz, siehe kGhostSeconds)
-    { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 0.92,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95,   0.00, 0.00, 0.0 },
+    { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 0.99,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95,   0.00, 0.00, 0.0 },
 };
 
 // Tap-Verlauf der Schwapp-Echos (8 Echos): abfallend bzw. anschwellend, Mischung ueber echoSwell
@@ -88,10 +88,10 @@ struct Room { double level, replace, bright, detune, size; };
 static const Room kRoom[kNumModes] = {
     { 0.35, 0.88, 0.55, 0.00, 0.06 },   // Innere Stimme: winzig, eng, nur ein Hauch Raum im Kopf
     { 0.72, 0.62, 0.28, 0.15, 0.30 },   // Erinnerung: kleines, dumpfes, altes Zimmer
-    { 0.78, 0.72, 0.32, 0.70, 1.00 },   // Traum: riesig, dunkel, schwebend
+    { 1.05, 0.72, 0.32, 0.90, 1.00 },   // Traum: riesig, dunkel, stark schwebend
     { 0.00, 0.65, 0.40, 0.35, 0.55 } }; // Geist: kein Vorwaerts-Hall, nur Reverse (die Stimme bleibt trocken)
-constexpr double kFlutterAmount = 0.45;   // Airwindows-Flutter: Tiefe des Bandleierns
-constexpr double kVibeDrift = 0.55;       // Airwindows-GalacticVibe: Geschwindigkeit des Waberns
+constexpr double kFlutterAmount = 0.52;   // Airwindows-Flutter: Tiefe des Bandleierns
+constexpr double kVibeDrift = 0.62;       // Airwindows-GalacticVibe: Geschwindigkeit des Waberns
 constexpr double kSmoothSeconds = 0.060;    // Zeit, in der Moduswechsel ueberblendet werden
 
 // ======================================================================================================
