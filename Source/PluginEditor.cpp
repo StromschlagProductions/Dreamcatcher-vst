@@ -80,7 +80,8 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
     body ("Die Stereobreite des Effekts: 0 % = mono, 100 % = so breit, wie der Modus abgestimmt ist, 200 % = deutlich breiter. Über 100 % wird "
           "das Seitensignal zusätzlich minimal verzögert (nach dem Prinzip von Airwindows Wider), dann wirkt der Klang breiter als die Lautsprecher. "
           "Die unbearbeitete Stimme (Effekt-Fader auf 0 %) bleibt davon unberührt.");
-    note ("Sehr breite Einstellungen klingen in Mono dünner. Wenn die Produktion auch in Mono funktionieren muss, kurz in Mono gegenhören.");
+    note ("Der Regler ist monokompatibel: Er verändert nur das Seitensignal. In Mono klingt es bei 0 %, 100 % und 200 % exakt gleich, "
+          "man hört dort nur die Breite nicht.");
 
     head ("EFFEKT (Fader, 0–100 %)");
     body ("0 % = die Stimme unbearbeitet, 100 % = der volle Klang des gewählten Modus. Dazwischen blendet der Fader fließend über. "
