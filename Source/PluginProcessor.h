@@ -44,6 +44,7 @@ private:
     std::atomic<float>* pDream = nullptr;
     std::atomic<float>* pHall = nullptr;
     std::atomic<float>* pEcho = nullptr;
+    std::atomic<float>* pWidth = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DreamcatcherProcessor)
 };

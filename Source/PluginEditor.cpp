@@ -57,7 +57,7 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
               juce::Font (juce::FontOptions (17.0f, juce::Font::bold)), accent);
 
     body ("Dreamcatcher ist ein Insert-Effekt für Stimmen, die nicht im Raum der Szene sprechen: innere Stimme, Erinnerung und Traum. "
-          "Der Klang jedes Modus ist fest abgestimmt. Bedient wird es mit dem Modus, dem Effekt-Fader und zwei Drehreglern, mit denen du Hall und Echo des Modus anpasst.");
+          "Der Klang jedes Modus ist fest abgestimmt. Bedient wird es mit dem Modus, dem Effekt-Fader und drei Drehreglern, mit denen du Hall, Echo und Stereobreite des Modus anpasst.");
 
     head ("MODUS");
     body ("Innere Stimme: Die Stimme rückt ins Innere des Kopfes. Schmal und nah, ein winziger, enger Raum, ein Hauch Echo, Höhen weicher, Tiefen weg.");
@@ -75,6 +75,12 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
     body ("Im Modus Geist heißen die Regler Reverse-Hall und Reverse-Echo: Damit wählst du, ob nur der rückwärts anschwellende Hall, nur die "
           "rückwärts gespielten Echos oder beides vor der Stimme liegen.");
     note ("Mehr Hall oder Echo macht den Klang lauter, weniger leiser; der Pegelausgleich gilt für die Einstellung 100 %.");
+
+    head ("BREITE (Drehregler, 0–200 %)");
+    body ("Die Stereobreite des Effekts: 0 % = mono, 100 % = so breit, wie der Modus abgestimmt ist, 200 % = deutlich breiter. Über 100 % wird "
+          "das Seitensignal zusätzlich minimal verzögert (nach dem Prinzip von Airwindows Wider), dann wirkt der Klang breiter als die Lautsprecher. "
+          "Die unbearbeitete Stimme (Effekt-Fader auf 0 %) bleibt davon unberührt.");
+    note ("Sehr breite Einstellungen klingen in Mono dünner. Wenn die Produktion auch in Mono funktionieren muss, kurz in Mono gegenhören.");
 
     head ("EFFEKT (Fader, 0–100 %)");
     body ("0 % = die Stimme unbearbeitet, 100 % = der volle Klang des gewählten Modus. Dazwischen blendet der Fader fließend über. "
@@ -133,6 +139,9 @@ DreamcatcherEditor::DreamcatcherEditor (DreamcatcherProcessor& p) : AudioProcess
 
     setupKnob (hallKnob, "hall");
     setupKnob (echoKnob, "echo");
+    setupKnob (widthKnob, "width");
+    widthKnob.label.setText (u8 ("BREITE"), juce::dontSendNotification);
+    widthKnob.slider.setTooltip (u8 ("Stereobreite: 0 % = mono, 100 % = wie der Modus abgestimmt ist, 200 % = breiter als die Lautsprecher. Doppelklick: 100 %"));
 
     themeButton.onClick = [this]
     {
@@ -241,7 +250,7 @@ void DreamcatcherEditor::applyTheme()
     look.setColour (juce::PopupMenu::highlightedBackgroundColourId, theme.accent);
     look.setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::black);
     look.setColour (juce::Label::textColourId, theme.text);
-    for (auto* k : { &hallKnob, &echoKnob }) k->label.setColour (juce::Label::textColourId, theme.dim);
+    for (auto* k : { &hallKnob, &echoKnob, &widthKnob }) k->label.setColour (juce::Label::textColourId, theme.dim);
     look.setColour (juce::TextButton::buttonColourId, theme.dark ? theme.panel : theme.bg);
     look.setColour (juce::TextButton::buttonOnColourId, theme.accent);
     look.setColour (juce::TextButton::textColourOffId, theme.text);
@@ -352,13 +361,13 @@ void DreamcatcherEditor::paint (juce::Graphics& g)
     // Karte Modus
     card (12.0f, 76.0f, (float) W - 24.0f, 84.0f, "MODUS");
     // Karte Effekt-Fader
-    card (12.0f, 170.0f, 410.0f, 150.0f, "EFFEKT");
+    card (12.0f, 170.0f, 320.0f, 150.0f, "EFFEKT");
     g.setColour (theme.dim);
     g.setFont (juce::FontOptions (11.5f));
-    g.drawText (u8 ("0 %  ·  Stimme unbearbeitet"), 24, 206, 190, 16, juce::Justification::centredLeft);
-    g.drawText (u8 ("100 %  ·  voller Klang"), 410 - 190, 206, 190, 16, juce::Justification::centredRight);
+    g.drawText (u8 ("0 %  ·  Stimme unbearbeitet"), 24, 206, 160, 16, juce::Justification::centredLeft);
+    g.drawText (u8 ("100 %  ·  voller Klang"), 320 - 130, 206, 130, 16, juce::Justification::centredRight);
     // Karte Hall / Echo
-    card (432.0f, 170.0f, (float) W - 444.0f, 150.0f, m == dch::kGhost ? u8 ("REVERSE") : u8 ("HALL & ECHO"));
+    card (342.0f, 170.0f, (float) W - 354.0f, 150.0f, m == dch::kGhost ? u8 ("REVERSE & BREITE") : u8 ("HALL · ECHO · BREITE"));
     // Karte Beschreibung
     card (12.0f, 330.0f, (float) W - 24.0f, 78.0f, modeShort (m));
     g.setColour (theme.text);
@@ -388,11 +397,16 @@ void DreamcatcherEditor::resized()
     for (int i = 0; i < 4; ++i)
         modeButtons[i].setBounds (bx + i * (bw + 10), 106, bw, 44);
 
-    fader.setBounds (24, 228, 386, 72);
-    hallKnob.label.setBounds (440, 192, 110, 16);
-    echoKnob.label.setBounds (550, 192, 110, 16);
-    hallKnob.slider.setBounds (445, 208, 100, 106);
-    echoKnob.slider.setBounds (555, 208, 100, 106);
+    fader.setBounds (24, 228, 296, 72);
+    {
+        Knob* ks[3] = { &hallKnob, &echoKnob, &widthKnob };
+        for (int i = 0; i < 3; ++i)
+        {
+            const int x = 350 + i * 106;
+            ks[i]->label.setBounds (x, 192, 104, 16);
+            ks[i]->slider.setBounds (x + 2, 208, 100, 106);
+        }
+    }
 
     helpScroll.toFront (false);
 }

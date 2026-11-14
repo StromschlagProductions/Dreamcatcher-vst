@@ -79,7 +79,7 @@ private:
     };
     void setupKnob (Knob&, const juce::String& paramId);
     void updateKnobLabels();
-    Knob hallKnob, echoKnob;
+    Knob hallKnob, echoKnob, widthKnob;
 
     juce::TextButton themeButton, helpButton;
     HelpPanel helpScroll;

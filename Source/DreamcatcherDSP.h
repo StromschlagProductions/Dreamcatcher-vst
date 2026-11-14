@@ -792,6 +792,7 @@ public:
         int n = 1; while ((double) n < 3.4 * sr) n <<= 1;
         echoBuf.assign ((size_t) n, 0.0); echoMask = n - 1; echoPos = 0;
         swell.prepare (sr);
+        sideDelay = std::min (60.0, 0.00045 * sr);   // ca. 0,45 ms wie bei Wider (20 Samples bei 44,1 kHz)
         for (int m = 0; m < kNumModes; ++m) room[m].prepare (sr, kRoom[m]);
         ghostDelay = swell.latency();
         for (auto* r : { &dlL, &dlR, &dryL, &dryR }) r->init (ghostDelay);
@@ -814,6 +815,7 @@ public:
         for (auto* r : { &dlL, &dlR, &dryL, &dryR }) r->clear();
         std::fill (revBuf.begin(), revBuf.end(), 0.0); revPos = 0; revPhase = 0; revLpL = revLpR = 0.0;
         ghostRunning = false;
+        std::fill (sideBuf, sideBuf + 64, 0.0); sidePos = 0;
         for (int m = 0; m < kNumModes; ++m) { room[m].reset(); roomRunning[m] = false; }
     }
     void setMode (int m) { mode = std::max (0, std::min (kNumModes - 1, m)); }
@@ -822,10 +824,10 @@ public:
 
     // dream: 0..1 (0 = unbearbeitete Stimme, 1 = voller Klang)
     // hall, echo: 0..2 (1 = so, wie der Modus abgestimmt ist)
-    void process (float* left, float* right, int n, double dream, double hall = 1.0, double echo = 1.0)
+    void process (float* left, float* right, int n, double dream, double hall = 1.0, double echo = 1.0, double width = 1.0)
     {
         const Voicing& v = kVoicing[mode];
-        if (! started) { amount = dream; hallK = hall; echoK = echo; started = true; }
+        if (! started) { amount = dream; hallK = hall; echoK = echo; widthK = width; started = true; }
         const double ghostTarget = mode == kGhost ? 1.0 : 0.0;
         for (int i = 0; i < n; ++i)
         {
@@ -843,6 +845,7 @@ public:
             amount += (dream - amount) * fader;
             hallK += (hall - hallK) * fader;
             echoK += (echo - echoK) * fader;
+            widthK += (width - widthK) * fader;
             ghostAmt += (ghostTarget - ghostAmt) * smooth;
 
             // Echo-Zeiten gehoeren zum Modus: Echos erst ausblenden, dann Zeiten wechseln (kein Pitch-Rutschen)
@@ -979,7 +982,23 @@ public:
                 l += hl; r += hr;
             }
 
-            // 7. Fader: unbearbeitet <-> voller Effekt
+            // 7. Breite (Mitte/Seite): 0 = mono, 1 = wie abgestimmt, 2 = doppelte Seite plus kurz verzoegerte Seite
+            //    (Prinzip aus Airwindows Wider): wirkt breiter als die Lautsprecher
+            {
+                const double mid = 0.5 * (l + r), side = 0.5 * (l - r);
+                sideBuf[(size_t) (sidePos & 63)] = side;
+                double sd = 0.0;
+                if (widthK > 1.0)
+                {
+                    const int i0 = (int) sideDelay; const double fr = sideDelay - i0;
+                    sd = sideBuf[(size_t) ((sidePos - i0) & 63)] * (1.0 - fr) + sideBuf[(size_t) ((sidePos - i0 - 1) & 63)] * fr;
+                }
+                ++sidePos;
+                const double s2 = side * widthK + (widthK > 1.0 ? (widthK - 1.0) * 0.7 * sd : 0.0);
+                l = mid + s2; r = mid - s2;
+            }
+
+            // 8. Fader: unbearbeitet <-> voller Effekt
             l = safe (outDryL * (1.0 - amount) + l * amount);
             r = safe (outDryR * (1.0 - amount) + r * amount);
             left[i] = (float) l;
@@ -1047,6 +1066,8 @@ private:
     int revMask = 0, revPos = 0, revPhase = 0, revLen = 64;
     double revCoef = 0.3, revLpL = 0.0, revLpR = 0.0;
     // Regler Hall / Echo (geglaettet)
-    double hallK = 1.0, echoK = 1.0;
+    double hallK = 1.0, echoK = 1.0, widthK = 1.0;
+    double sideBuf[64] {}, sideDelay = 20.0;
+    int sidePos = 0;
 };
 }  // namespace dch
