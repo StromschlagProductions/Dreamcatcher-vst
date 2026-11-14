@@ -1,0 +1,82 @@
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
+
+// Reihenfolge muss zu enum Mode in DreamcatcherDSP.h passen
+juce::StringArray DreamcatcherProcessor::modeNames() { return { "Innere Stimme", "Erinnerung", "Traum" }; }
+
+juce::AudioProcessorValueTreeState::ParameterLayout DreamcatcherProcessor::createLayout()
+{
+    using namespace juce;
+    AudioProcessorValueTreeState::ParameterLayout layout;
+
+    auto percent = AudioParameterFloatAttributes().withStringFromValueFunction (
+        [] (float v, int) { return String (roundToInt (v * 100.0f)) + " %"; });
+
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { "mode", 1 }, "Modus", modeNames(), 0));
+    // 0 % = Stimme unbearbeitet, 100 % = voller Klang des Modus (Standard: 100 %)
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "dream", 1 }, "Effekt",
+                                                       NormalisableRange<float> (0.0f, 1.0f), 1.0f, percent));
+    return layout;
+}
+
+DreamcatcherProcessor::DreamcatcherProcessor()
+    : AudioProcessor (BusesProperties()
+                          .withInput ("Input", juce::AudioChannelSet::stereo(), true)
+                          .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+      apvts (*this, nullptr, "DREAMCATCHER", createLayout())
+{
+    pMode = apvts.getRawParameterValue ("mode");
+    pDream = apvts.getRawParameterValue ("dream");
+}
+
+void DreamcatcherProcessor::prepareToPlay (double sampleRate, int)
+{
+    engine.prepare (sampleRate);
+    engine.setMode (juce::roundToInt (pMode->load()));
+    setLatencySamples (0);   // der Effekt setzt mit dem Audio ein, es wird nichts vorgehalten
+}
+
+bool DreamcatcherProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+{
+    const auto out = layouts.getMainOutputChannelSet();
+    const auto in = layouts.getMainInputChannelSet();
+    if (out != juce::AudioChannelSet::mono() && out != juce::AudioChannelSet::stereo())
+        return false;
+    if (in == out) return true;
+    return in == juce::AudioChannelSet::mono() && out == juce::AudioChannelSet::stereo();
+}
+
+void DreamcatcherProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
+    juce::ScopedNoDenormals noDenormals;
+    const int numSamples = buffer.getNumSamples();
+    const int numCh = buffer.getNumChannels();
+    if (numSamples == 0 || numCh == 0)
+        return;
+
+    // Mono hinein, Stereo heraus: Eingang auf beide Kanaele legen
+    if (getTotalNumInputChannels() == 1 && numCh > 1)
+        buffer.copyFrom (1, 0, buffer, 0, 0, numSamples);
+
+    engine.setMode (juce::roundToInt (pMode->load()));
+    float* l = buffer.getWritePointer (0);
+    float* r = numCh > 1 ? buffer.getWritePointer (1) : nullptr;
+    engine.process (l, r, numSamples, (double) pDream->load());
+}
+
+void DreamcatcherProcessor::getStateInformation (juce::MemoryBlock& destData)
+{
+    if (auto xml = apvts.copyState().createXml())
+        copyXmlToBinary (*xml, destData);
+}
+
+void DreamcatcherProcessor::setStateInformation (const void* data, int sizeInBytes)
+{
+    if (auto xml = getXmlFromBinary (data, sizeInBytes))
+        if (xml->hasTagName (apvts.state.getType()))
+            apvts.replaceState (juce::ValueTree::fromXml (*xml));
+}
+
+juce::AudioProcessorEditor* DreamcatcherProcessor::createEditor() { return new DreamcatcherEditor (*this); }
+
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new DreamcatcherProcessor(); }
