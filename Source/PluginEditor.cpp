@@ -13,19 +13,22 @@ juce::String modeDescription (int m)
     switch (m)
     {
         case dch::kInner:
-            return u8 ("Die Stimme rückt ins Innere des Kopfes: leicht verbreitert, ein Hauch Echo, die Höhen etwas weicher, die Tiefen weg. "
+            return u8 ("Die Stimme rückt ins Innere des Kopfes: schmal, nah, ein kurzer Hauch Echo, die Höhen etwas weicher, die Tiefen weg. "
                        "Für Gedanken und die Stimme im Kopf einer Figur.");
         case dch::kMemory:
-            return u8 ("Die Stimme zerfällt leicht: Sie stottert an einzelnen Stellen, sinkt minimal ab, klingt dünn und dumpf und hat ein Echo "
-                       "wie aus weiter Ferne der Zeit. Für Rückblenden, zum Beispiel die alte Stimme, die aus einer Überblendung kommt.");
+            return u8 ("Die Stimme zerfällt: Sie stottert, sinkt ab, klingt dünn und dumpf. Nach einem Pre-Delay schwappen Echos von links nach rechts "
+                       "heran und schwellen an, wop, wop. Für Rückblenden, zum Beispiel die alte Stimme, die aus einer Überblendung kommt.");
+        case dch::kDream:
+            return u8 ("Die Stimme ist körnig verstimmt und in eine weite, dunkle Wolke aus Echos gehüllt, die langsam heranschwillt "
+                       "und schwebend wieder abtaucht. Für Träume, Fieber und Halbschlaf.");
         default:
-            return u8 ("Die Stimme ist körnig verstimmt und in eine weite Wolke aus Echos gehüllt, dunkel und schwebend. "
-                       "Für Träume, Fieber und Halbschlaf.");
+            return u8 ("Reverse-Hall: Vor jedem Wort schwillt ein Geisterhall an, dann kommt die Stimme. Das Plugin meldet dafür rund 0,6 s Latenz, die "
+                       "die DAW ausgleicht. Für Geister und Erscheinungen. Am besten auf einer eigenen Spur oder Plugin-Instanz.");
     }
 }
 juce::String modeShort (int m)
 {
-    return m == dch::kInner ? u8 ("INNERE STIMME") : m == dch::kMemory ? u8 ("ERINNERUNG") : u8 ("TRAUM");
+    return m == dch::kInner ? u8 ("INNERE STIMME") : m == dch::kMemory ? u8 ("ERINNERUNG") : m == dch::kDream ? u8 ("TRAUM") : u8 ("GEIST");
 }
 }
 
@@ -57,10 +60,12 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
           "Der Klang jedes Modus ist fest abgestimmt, es gibt nichts zu basteln. Es gibt nur zwei Regler: den Modus und den Effekt-Fader.");
 
     head ("MODUS");
-    body ("Innere Stimme: Die Stimme rückt ins Innere des Kopfes. Leicht verbreitert, ein Hauch Echo, Höhen weicher, Tiefen weg.");
-    body ("Erinnerung: Die Stimme stottert an einzelnen Stellen, sinkt minimal ab, klingt dünn und dumpf mit Echo wie aus der Ferne der Zeit. "
-          "Gedacht für Rückblenden.");
-    body ("Traum: Körnig verstimmt, in einer weiten Wolke aus Echos, dunkel und schwebend.");
+    body ("Innere Stimme: Die Stimme rückt ins Innere des Kopfes. Schmal und nah, ein kurzer Hauch Echo, Höhen weicher, Tiefen weg.");
+    body ("Erinnerung: Die Stimme stottert, sinkt ab, klingt dünn und dumpf. Nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts "
+          "heran und schwellen an (wop, wop). Gedacht für Rückblenden.");
+    body ("Traum: Körnig verstimmt, in einer weiten, dunklen Wolke aus Echos, die langsam anschwillt und schwebend abtaucht.");
+    body ("Geist: Echter Reverse-Hall. Vor jedem Wort schwillt ein Geisterhall an, dann erst kommt die Stimme. Dafür muss das Plugin die Stimme "
+          "um rund 0,6 Sekunden verzögern und meldet diese Latenz dem Host; die DAW gleicht sie aus, sodass der Schwell hörbar VOR der Stimme liegt.");
     body ("Der Modus lässt sich automatisieren. Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über, es knackt nicht.");
 
     head ("EFFEKT (Fader, 0–100 %)");
@@ -70,8 +75,9 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
     note ("Es gibt bewusst keinen Ausgangsregler. Der Pegel ist fest ausgeglichen, bei 100 % ist die Stimme etwa so laut wie bei 0 %.");
 
     head ("Allgemein");
-    body ("Der Effekt setzt mit dem Audio ein, das Plugin meldet dem Host keine Latenz. Die bearbeitete Stimme liegt durch die Echo- und Stotter-Bausteine "
-          "ein paar Millisekunden hinter der unbearbeiteten, das ist Teil des Klangs. Nach dem Ende der Stimme klingt die Echo-Wolke noch kurz nach.");
+    body ("Latenz: Nur im Modus Geist meldet das Plugin rund 0,6 s Latenz an den Host, in den anderen drei Modi ist es latenzfrei. Weil sich die gemeldete "
+          "Latenz beim Moduswechsel ändert, nimm Geist am besten auf einer eigenen Spur oder Plugin-Instanz und automatisiere den Modus nicht quer durch die Szene. "
+          "Nach dem Ende der Stimme klingen die Echos bis zu etwa drei Sekunden nach.");
     body ("Doppelklick auf den Fader setzt ihn auf 100 % zurück. Look: Dunkel / Hell, das Fenster ist am rechten unteren Rand skalierbar (50–300 %), "
           "beides wird mit dem Projekt gespeichert.");
     body ("Auch auf einem Bus: Du kannst Dreamcatcher auf einen Gruppenkanal legen, damit die Stimme und die Geräusche einer Traum- oder "
@@ -99,15 +105,16 @@ DreamcatcherEditor::DreamcatcherEditor (DreamcatcherProcessor& p) : AudioProcess
     setLookAndFeel (&look);
 
     const auto modes = DreamcatcherProcessor::modeNames();
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 4; ++i)
     {
         modeButtons[i].setButtonText (modes[i].toUpperCase());
         modeButtons[i].onClick = [this, i] { setMode (i); };
         content.addAndMakeVisible (modeButtons[i]);
     }
     modeButtons[0].setTooltip (u8 ("Die Stimme im Kopf einer Figur: nah, leicht verbreitert, weich"));
-    modeButtons[1].setTooltip (u8 ("Rückblende: stotternd, leicht abgesunken, dünn und dumpf mit Echo"));
-    modeButtons[2].setTooltip (u8 ("Traum: körnig verstimmt, in einer weiten Echo-Wolke"));
+    modeButtons[1].setTooltip (u8 ("Rückblende: stotternd, abgesunken, dünn und dumpf, mit heranschwappenden Echos"));
+    modeButtons[2].setTooltip (u8 ("Traum: körnig verstimmt, in einer weiten, anschwellenden Echo-Wolke"));
+    modeButtons[3].setTooltip (u8 ("Geist: Reverse-Hall vor der Stimme (meldet ca. 0,6 s Latenz)"));
 
     fader.setSliderStyle (juce::Slider::LinearHorizontal);
     fader.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
@@ -152,7 +159,7 @@ DreamcatcherEditor::~DreamcatcherEditor()
 
 int DreamcatcherEditor::currentMode() const
 {
-    return juce::jlimit (0, 2, juce::roundToInt (processor.apvts.getRawParameterValue ("mode")->load()));
+    return juce::jlimit (0, 3, juce::roundToInt (processor.apvts.getRawParameterValue ("mode")->load()));
 }
 
 void DreamcatcherEditor::setMode (int m)
@@ -180,7 +187,7 @@ void DreamcatcherEditor::timerCallback()
 void DreamcatcherEditor::updateModeButtons()
 {
     const int m = currentMode();
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 4; ++i)
         modeButtons[i].setToggleState (i == m, juce::dontSendNotification);
 }
 
@@ -336,8 +343,8 @@ void DreamcatcherEditor::resized()
     helpScroll.setBounds (12, 76, w - 24, 332);
     helpText.setWidth (helpScroll.getMaximumVisibleWidth());
 
-    const int bx = 24, bw = (w - 48 - 20) / 3;
-    for (int i = 0; i < 3; ++i)
+    const int bx = 24, bw = (w - 48 - 30) / 4;
+    for (int i = 0; i < 4; ++i)
         modeButtons[i].setBounds (bx + i * (bw + 10), 106, bw, 44);
 
     fader.setBounds (24, 214, w - 48, 66);

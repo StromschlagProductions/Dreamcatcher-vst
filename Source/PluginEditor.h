@@ -65,7 +65,7 @@ private:
     bool sizeReady = false;
     juce::Image logo;
 
-    juce::TextButton modeButtons[3];
+    juce::TextButton modeButtons[4];
     int shownMode = -1;
 
     juce::Slider fader;

@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 
 // Reihenfolge muss zu enum Mode in DreamcatcherDSP.h passen
-juce::StringArray DreamcatcherProcessor::modeNames() { return { "Innere Stimme", "Erinnerung", "Traum" }; }
+juce::StringArray DreamcatcherProcessor::modeNames() { return { "Innere Stimme", "Erinnerung", "Traum", "Geist" }; }
 
 juce::AudioProcessorValueTreeState::ParameterLayout DreamcatcherProcessor::createLayout()
 {
@@ -31,9 +31,10 @@ DreamcatcherProcessor::DreamcatcherProcessor()
 
 void DreamcatcherProcessor::prepareToPlay (double sampleRate, int)
 {
+    engine.setMode (juce::roundToInt (pMode->load()));   // vor prepare: Startzustand passt gleich zum Modus
     engine.prepare (sampleRate);
-    engine.setMode (juce::roundToInt (pMode->load()));
-    setLatencySamples (0);   // der Effekt setzt mit dem Audio ein, es wird nichts vorgehalten
+    reportedLatency = engine.latencySamples();
+    setLatencySamples (reportedLatency.load());   // nur im Modus Geist: Vorlauf fuer den Reverse-Hall, gleicht der Host aus
 }
 
 bool DreamcatcherProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -62,6 +63,12 @@ void DreamcatcherProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     float* l = buffer.getWritePointer (0);
     float* r = numCh > 1 ? buffer.getWritePointer (1) : nullptr;
     engine.process (l, r, numSamples, (double) pDream->load());
+
+    if (engine.latencySamples() != reportedLatency.load())
+    {
+        reportedLatency = engine.latencySamples();   // Moduswechsel: Host ueber die neue Latenz informieren
+        triggerAsyncUpdate();
+    }
 }
 
 void DreamcatcherProcessor::getStateInformation (juce::MemoryBlock& destData)

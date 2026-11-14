@@ -21,7 +21,7 @@
 
 namespace dch
 {
-enum Mode { kInner = 0, kMemory = 1, kDream = 2, kNumModes };
+enum Mode { kInner = 0, kMemory = 1, kDream = 2, kGhost = 3, kNumModes };
 
 // ======================================================================================================
 //  KLANGWERTE - hier wird der Klang der drei Modi abgestimmt (alles an einer Stelle)
@@ -37,17 +37,37 @@ struct Voicing
     double highpassHz;   // Tiefen weg
     double lowpassHz;    // Hoehen weg (dumpfer = weiter weg / aelter)
     double trim;         // fester Pegelausgleich (linear), damit 100 % etwa so laut ist wie 0 %
+    // Schwapp-Echo (Ping-Pong, optional anschwellend)
+    double echoLevel;    // Lautstaerke der Echos 0..1 (0 = aus)
+    double echoPreMs;    // Pre-Delay vor dem ersten Echo
+    double echoSpaceMs;  // Abstand zwischen den Echos
+    double echoSwell;    // 0 = Echos werden gleich leiser, 1 = Echos schwellen erst an und klingen dann aus
+    double echoWidth;    // 0 = alle Echos mittig, 1 = Echos wandern ganz zwischen links und rechts
+    double echoLpHz;     // Dunkelheit der Echos
+    // Reverse-Hall (nur Geist)
+    double ghostDry;     // Anteil der (verzoegerten) Stimme, die am Ende des Schwells einsetzt
+    double ghostWet;     // Anteil des anschwellenden Reverse-Halls
 };
 
 // Reihenfolge wie enum Mode
 static const Voicing kVoicing[kNumModes] = {
-    // innere Stimme: nah, im Kopf, leicht verbreitert, ein Hauch Nachhall-Echos, nur wenig dunkler
-    { 0.00, 0.00, 0.12, 0.25, 0.35, 0.22, 140.0, 7500.0, 1.25 },
-    // Erinnerung: stotternde, leicht abgesunkene Stimme, duenn und dumpf wie aus der Ferne der Zeit
-    { 0.75, 0.00, 0.20, 0.20, 0.55, 0.35, 220.0, 4800.0, 2.00 },
-    // Traum: koernige, leicht verstimmte Stimme in einer weiten Wolke aus Echos
-    { 0.00, 0.60, 0.20, 0.30, 0.85, 0.70, 160.0, 4200.0, 1.80 },
+    // innere Stimme: nah, im Kopf, leicht verbreitert, nur ein kurzes leises Echo dahinter, wenig dunkler
+    { 0.00, 0.00, 0.12, 0.25, 0.35, 0.22, 140.0, 7500.0, 1.25,   0.18,  18.0,  90.0, 0.0, 0.3, 3500.0,   0.00, 0.00 },
+    // Erinnerung: stark zerfallende, dumpfe Stimme, dazu Pre-Delay und Echos, die schwappend zwischen links und rechts anschwellen
+    { 0.85, 0.00, 0.20, 0.20, 0.55, 0.30, 260.0, 3800.0, 2.00,   0.55, 120.0, 240.0, 0.7, 1.0, 2600.0,   0.00, 0.00 },
+    // Traum: koernig verstimmt, weite Wolke, dazu langsam anschwellende Echos
+    { 0.00, 0.75, 0.20, 0.30, 0.90, 0.60, 160.0, 4200.0, 1.80,   0.40,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00 },
+    // Geist: der Hall laeuft rueckwaerts und schwillt vor der Stimme an (Latenz, siehe kGhostSeconds)
+    { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 1.00,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95 },
 };
+
+// Tap-Verlauf der Schwapp-Echos (8 Echos): abfallend bzw. anschwellend, Mischung ueber echoSwell
+constexpr double kEchoDecay[8] = { 0.60, 0.42, 0.30, 0.21, 0.15, 0.10, 0.07, 0.05 };
+constexpr double kEchoSwell[8] = { 0.18, 0.34, 0.52, 0.66, 0.58, 0.40, 0.24, 0.12 };
+
+// Reverse-Hall (Geist): Laenge des Schwells in Sekunden, Abklingrate des Halls (in dB ueber die Laenge)
+constexpr double kGhostSeconds = 0.60;
+constexpr double kGhostDecayDb = 48.0;
 
 // GlitchShifter (Erinnerung): Tonhoehenabfall und Griffigkeit, feste Werte
 constexpr double kGlitchSpeed = -0.035;     // negativ = tiefer (ca. -0,6 Halbtoene)
@@ -363,6 +383,172 @@ struct Biquad
 };
 
 // ======================================================================================================
+//  Verzoegerungsring (feste Laenge, Rueckgabe = Wert von vor genau n Samples)
+// ======================================================================================================
+struct Ring
+{
+    std::vector<double> b;
+    int pos = 0;
+    void init (int n) { b.assign ((size_t) std::max (1, n), 0.0); pos = 0; }
+    void clear() { std::fill (b.begin(), b.end(), 0.0); pos = 0; }
+    double tick (double x)
+    {
+        const double y = b[(size_t) pos];
+        b[(size_t) pos] = x;
+        if (++pos == (int) b.size()) pos = 0;
+        return y;
+    }
+};
+
+// ======================================================================================================
+//  Reverse-Hall (Geist): Faltung mit einem rueckwaerts laufenden Hall-Ausklang
+//
+//  Ein normaler Hall klingt nach dem Ton aus. Dreht man den Ausklang um, schwillt der Hall VOR dem Ton an.
+//  Das Plugin macht genau das in Echtzeit: Es faltet die Stimme mit einem umgedrehten, nach oben gerichteten
+//  Hall-Ausklang (Rauschen mit abnehmender Daempfung der Hoehen). Der Schwell erreicht seinen Hoehepunkt erst
+//  kGhostSeconds nach dem Ton, darum wird die Stimme um genau diese Zeit verzoegert; die DAW gleicht diese Latenz aus,
+//  dann liegt der Schwell hoerbar vor der Stimme.
+// ======================================================================================================
+class SwellConvolver
+{
+public:
+    static constexpr int B = 512;          // Blockgroesse (Teil der Latenz)
+    static constexpr int F = 1024;         // FFT-Groesse = 2 * B
+
+    void prepare (double sampleRate)
+    {
+        irLen = std::max (B, (int) std::lround (kGhostSeconds * sampleRate));
+        parts = (irLen + B - 1) / B;
+        initFft();
+        for (int c = 0; c < 2; ++c)
+        {
+            std::vector<double> h = makeImpulseResponse (sampleRate, c == 0 ? 0x9E3779B9u : 0x85EBCA6Bu);
+            H[c].assign ((size_t) parts * F, Cx {});
+            for (int p = 0; p < parts; ++p)
+            {
+                Cx* dst = &H[c][(size_t) p * F];
+                for (int i = 0; i < B; ++i)
+                {
+                    const int k = p * B + i;
+                    dst[i].r = k < irLen ? h[(size_t) k] : 0.0;
+                }
+                fft (dst, false);
+            }
+        }
+        X.assign ((size_t) parts * F, Cx {});
+        reset();
+    }
+    void reset()
+    {
+        std::fill (X.begin(), X.end(), Cx {});
+        std::fill (prev, prev + B, 0.0);
+        std::fill (inBlk, inBlk + B, 0.0);
+        std::fill (out[0], out[0] + B, 0.0);
+        std::fill (out[1], out[1] + B, 0.0);
+        head = 0; fill = 0;
+    }
+    // Zeit vom Eingang bis zum Hoehepunkt des Schwells: so lange muss die Stimme verzoegert werden
+    int latency() const { return irLen + B; }
+
+    // m: Eingangswert (mono). Rueckgabe: Schwell links/rechts (um B Samples verzoegert, in latency() mit eingerechnet)
+    void tick (double m, double& wl, double& wr)
+    {
+        wl = out[0][fill];
+        wr = out[1][fill];
+        inBlk[fill] = m;
+        if (++fill == B) { runBlock(); fill = 0; }
+    }
+
+private:
+    struct Cx { double r = 0.0, i = 0.0; };
+
+    static uint32_t xorshift (uint32_t& s) { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+
+    std::vector<double> makeImpulseResponse (double sr, uint32_t seed) const
+    {
+        // natuerliche Richtung (s = Zeit seit dem Anfang des Halls): Rauschen, Hoehen sterben schneller, Pegel faellt ab
+        std::vector<double> nat ((size_t) irLen);
+        const double tau = (double) irLen / (kGhostDecayDb / 8.685889638);   // exp(-T/tau) = -kGhostDecayDb dB
+        double lp = 0.0;
+        const int fadeIn = std::max (1, (int) (0.003 * sr));
+        for (int s = 0; s < irLen; ++s)
+        {
+            const double noise = ((double) xorshift (seed) / 4294967295.0) * 2.0 - 1.0;
+            const double a = 0.10 + 0.55 * (1.0 - (double) s / (double) irLen);
+            lp += a * (noise - lp);
+            double v = lp * std::exp (-(double) s / tau);
+            if (s < fadeIn) v *= (double) s / (double) fadeIn;
+            nat[(size_t) s] = v;
+        }
+        std::vector<double> h ((size_t) irLen);
+        double energy = 0.0;
+        for (int k = 0; k < irLen; ++k) { h[(size_t) k] = nat[(size_t) (irLen - 1 - k)]; energy += h[(size_t) k] * h[(size_t) k]; }
+        const double norm = energy > 0.0 ? 1.0 / std::sqrt (energy) : 1.0;
+        for (auto& v : h) v *= norm;
+        return h;
+    }
+
+    void initFft()
+    {
+        rev.assign (F, 0);
+        int bits = 0; while ((1 << bits) < F) ++bits;
+        for (int i = 0; i < F; ++i) { int r = 0; for (int b = 0; b < bits; ++b) if (i & (1 << b)) r |= 1 << (bits - 1 - b); rev[(size_t) i] = r; }
+        tw.assign (F / 2, Cx {});
+        for (int k = 0; k < F / 2; ++k) { const double a = -2.0 * 3.14159265358979323846 * k / F; tw[(size_t) k].r = std::cos (a); tw[(size_t) k].i = std::sin (a); }
+    }
+    void fft (Cx* a, bool inverse) const
+    {
+        for (int i = 0; i < F; ++i) { const int j = rev[(size_t) i]; if (i < j) std::swap (a[i], a[j]); }
+        for (int len = 2; len <= F; len <<= 1)
+        {
+            const int half = len / 2, step = F / len;
+            for (int i = 0; i < F; i += len)
+                for (int k = 0; k < half; ++k)
+                {
+                    Cx w = tw[(size_t) (k * step)];
+                    if (inverse) w.i = -w.i;
+                    const Cx u = a[i + k], t = a[i + k + half];
+                    const Cx v { t.r * w.r - t.i * w.i, t.r * w.i + t.i * w.r };
+                    a[i + k] = { u.r + v.r, u.i + v.i };
+                    a[i + k + half] = { u.r - v.r, u.i - v.i };
+                }
+        }
+        if (inverse) { const double g = 1.0 / F; for (int i = 0; i < F; ++i) { a[i].r *= g; a[i].i *= g; } }
+    }
+
+    void runBlock()
+    {
+        // Overlap-Save: [vorheriger Block | neuer Block]
+        Cx* slot = &X[(size_t) head * F];
+        for (int i = 0; i < B; ++i) { slot[i] = { prev[i], 0.0 }; slot[B + i] = { inBlk[i], 0.0 }; prev[i] = inBlk[i]; }
+        fft (slot, false);
+        for (int c = 0; c < 2; ++c)
+        {
+            std::fill (acc, acc + F, Cx {});
+            for (int p = 0; p < parts; ++p)
+            {
+                const Cx* x = &X[(size_t) ((head - p + parts) % parts) * F];
+                const Cx* h = &H[c][(size_t) p * F];
+                for (int k = 0; k < F; ++k)
+                {
+                    acc[k].r += x[k].r * h[k].r - x[k].i * h[k].i;
+                    acc[k].i += x[k].r * h[k].i + x[k].i * h[k].r;
+                }
+            }
+            fft (acc, true);
+            for (int i = 0; i < B; ++i) out[c][i] = acc[B + i].r;
+        }
+        head = (head + 1) % parts;
+    }
+
+    int irLen = B, parts = 1, head = 0, fill = 0;
+    std::vector<int> rev;
+    std::vector<Cx> tw, H[2], X;
+    double prev[B] {}, inBlk[B] {}, out[2][B] {};
+    Cx acc[F];
+};
+
+// ======================================================================================================
 //  Die ganze Kette
 // ======================================================================================================
 class Engine
@@ -374,22 +560,34 @@ public:
         smooth = 1.0 - std::exp (-1.0 / (kSmoothSeconds * sr));
         fader = 1.0 - std::exp (-1.0 / (0.020 * sr));
         ens.prepare (sr); glitch.prepare (sr); nasty.prepare (sr);
+        int n = 1; while ((double) n < 3.4 * sr) n <<= 1;
+        echoBuf.assign ((size_t) n, 0.0); echoMask = n - 1; echoPos = 0;
+        swell.prepare (sr);
+        ghostDelay = swell.latency();
+        for (auto* r : { &dlL, &dlR, &dryL, &dryR }) r->init (ghostDelay);
         reset();
         snapToMode (mode);
     }
     void reset()
     {
-        ens.reset(); glitch.reset(); nasty.reset();
+        ens.reset(); glitch.reset(); nasty.reset(); swell.reset();
         for (auto& f : hp) f.clear();
         for (auto& f : lp) f.clear();
+        std::fill (echoBuf.begin(), echoBuf.end(), 0.0);
+        echoLpL = echoLpR = 0.0;
+        for (auto* r : { &dlL, &dlR, &dryL, &dryR }) r->clear();
+        ghostRunning = false;
     }
     void setMode (int m) { mode = std::max (0, std::min (kNumModes - 1, m)); }
+    // Latenz, die dem Host gemeldet werden muss: nur im Modus Geist (Schwell liegt VOR der Stimme)
+    int latencySamples() const { return mode == kGhost ? ghostDelay : 0; }
 
     // dream: 0..1 (0 = unbearbeitete Stimme, 1 = voller Klang)
     void process (float* left, float* right, int n, double dream)
     {
         const Voicing& v = kVoicing[mode];
         if (! started) { amount = dream; started = true; }
+        const double ghostTarget = mode == kGhost ? 1.0 : 0.0;
         for (int i = 0; i < n; ++i)
         {
             cur.glitchWet += (v.glitchWet - cur.glitchWet) * smooth;
@@ -402,6 +600,12 @@ public:
             cur.lowpassHz += (v.lowpassHz - cur.lowpassHz) * smooth;
             cur.trim += (v.trim - cur.trim) * smooth;
             amount += (dream - amount) * fader;
+            ghostAmt += (ghostTarget - ghostAmt) * smooth;
+
+            // Echo-Zeiten gehoeren zum Modus: Echos erst ausblenden, dann Zeiten wechseln (kein Pitch-Rutschen)
+            const double echoTarget = (echoMode == mode) ? kVoicing[echoMode].echoLevel : 0.0;
+            echoLevel += (echoTarget - echoLevel) * smooth;
+            if (echoMode != mode && echoLevel < 0.002) setEchoMode (mode);
 
             if ((counter++ & 15) == 0)
             {
@@ -410,8 +614,8 @@ public:
                 for (auto& f : lp) f.set (false, cur.lowpassHz, sr);
             }
 
-            const double dryL = left[i], dryR = right != nullptr ? right[i] : left[i];
-            double l = dryL, r = dryR;
+            const double rawL = left[i], rawR = right != nullptr ? right[i] : left[i];
+            double l = rawL, r = rawR;
 
             // 1. Tonhoehen- und Stotterbausteine laufen immer mit (frische Puffer), der Anteil wird ueberblendet
             double gl = l, gr = r;
@@ -424,17 +628,59 @@ public:
             l = l * (1.0 - cur.nastyWet) + nl * cur.nastyWet;
             r = r * (1.0 - cur.nastyWet) + nr * cur.nastyWet;
 
-            // 2. Breite und Echo-Wolke
+            // 2. Schwapp-Echo: Pre-Delay, dann Ping-Pong-Echos (abfallend oder anschwellend)
+            const double mono = 0.5 * (l + r);
+            echoBuf[(size_t) (echoPos & echoMask)] = mono;
+            double eL = 0.0, eR = 0.0;
+            if (echoLevel > 0.0005)
+            {
+                const Voicing& ev = kVoicing[echoMode];
+                for (int k = 1; k <= 8; ++k)
+                {
+                    const double g = kEchoDecay[k - 1] * (1.0 - ev.echoSwell) + kEchoSwell[k - 1] * ev.echoSwell;
+                    const double other = g * (1.0 - ev.echoWidth);
+                    const double t = echoBuf[(size_t) ((echoPos - echoPre - k * echoSpace) & echoMask)];
+                    if (k & 1) { eL += g * t; eR += other * t; }
+                    else       { eR += g * t; eL += other * t; }
+                }
+                echoLpL += echoCoef * (eL - echoLpL);
+                echoLpR += echoCoef * (eR - echoLpR);
+            }
+            else { echoLpL += echoCoef * (0.0 - echoLpL); echoLpR += echoCoef * (0.0 - echoLpR); }
+            ++echoPos;
+
+            // 3. Breite und Echo-Wolke
             if (cur.wideSoar > 0.0005) sweetWide (l, r, cur.wideSoar, cur.wideBlend);
             ens.process (l, r, cur.ensLevel);
+            l += echoLpL * echoLevel;
+            r += echoLpR * echoLevel;
 
-            // 3. Klangfarbe
+            // 4. Klangfarbe
             l = lp[0].tick (hp[0].tick (l)) * cur.trim;
             r = lp[1].tick (hp[1].tick (r)) * cur.trim;
 
-            // 4. Fader: unbearbeitet <-> voller Effekt
-            l = safe (dryL * (1.0 - amount) + l * amount);
-            r = safe (dryR * (1.0 - amount) + r * amount);
+            // 5. Geist: Reverse-Hall. Die Stimme wird um die Schwell-Laenge verzoegert, der Schwell liegt davor.
+            double outDryL = rawL, outDryR = rawR;
+            const double dgl = dlL.tick (l), dgr = dlR.tick (r);        // verzoegerte Stimme (laeuft immer mit)
+            const double drl = dryL.tick (rawL), drr = dryR.tick (rawR);
+            if (ghostTarget > 0.0 && ! ghostRunning) { swell.reset(); ghostRunning = true; }
+            if (ghostRunning)
+            {
+                double wl = 0.0, wr = 0.0;
+                swell.tick (0.5 * (l + r), wl, wr);
+                const Voicing& gv = kVoicing[kGhost];
+                const double gL = dgl * gv.ghostDry + wl * gv.ghostWet;
+                const double gR = dgr * gv.ghostDry + wr * gv.ghostWet;
+                l = l * (1.0 - ghostAmt) + gL * ghostAmt;
+                r = r * (1.0 - ghostAmt) + gR * ghostAmt;
+                outDryL = rawL * (1.0 - ghostAmt) + drl * ghostAmt;
+                outDryR = rawR * (1.0 - ghostAmt) + drr * ghostAmt;
+                if (ghostTarget == 0.0 && ghostAmt < 0.0005) ghostRunning = false;
+            }
+
+            // 6. Fader: unbearbeitet <-> voller Effekt
+            l = safe (outDryL * (1.0 - amount) + l * amount);
+            r = safe (outDryR * (1.0 - amount) + r * amount);
             left[i] = (float) l;
             if (right != nullptr) right[i] = (float) r;
         }
@@ -447,24 +693,43 @@ private:
         if (! std::isfinite (x)) return 0.0;
         return std::max (-16.0, std::min (16.0, x));
     }
+    void setEchoMode (int m)
+    {
+        echoMode = m;
+        const Voicing& ev = kVoicing[m];
+        echoPre = std::max (1, (int) std::lround (ev.echoPreMs * 0.001 * sr));
+        echoSpace = std::max (1, (int) std::lround (ev.echoSpaceMs * 0.001 * sr));
+        echoCoef = 1.0 - std::exp (-2.0 * 3.14159265358979323846 * ev.echoLpHz / sr);
+    }
     void snapToMode (int m)
     {
         cur = kVoicing[std::max (0, std::min (kNumModes - 1, m))];
         ens.setDepth (cur.ensDepth);
         for (auto& f : hp) f.set (true, cur.highpassHz, sr);
         for (auto& f : lp) f.set (false, cur.lowpassHz, sr);
+        setEchoMode (std::max (0, std::min (kNumModes - 1, m)));
+        echoLevel = kVoicing[echoMode].echoLevel;
+        ghostAmt = m == kGhost ? 1.0 : 0.0;
         amount = 1.0;
         started = false;
     }
 
-    double sr = 44100.0, smooth = 0.001, fader = 0.001, amount = 1.0;
-    int mode = kInner;
-    bool started = false;
+    double sr = 44100.0, smooth = 0.001, fader = 0.001, amount = 1.0, ghostAmt = 0.0;
+    int mode = kInner, echoMode = kInner;
+    bool started = false, ghostRunning = false;
     unsigned counter = 0;
     Voicing cur = kVoicing[kInner];
     StereoEnsemble ens;
     GlitchShifter glitch;
     PitchNasty nasty;
     Biquad hp[2], lp[2];
+    // Echo
+    std::vector<double> echoBuf;
+    int echoMask = 0, echoPos = 0, echoPre = 1, echoSpace = 1;
+    double echoLevel = 0.0, echoCoef = 0.1, echoLpL = 0.0, echoLpR = 0.0;
+    // Geist
+    SwellConvolver swell;
+    Ring dlL, dlR, dryL, dryR;
+    int ghostDelay = 1;
 };
 }  // namespace dch

@@ -2,7 +2,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "DreamcatcherDSP.h"
 
-class DreamcatcherProcessor : public juce::AudioProcessor
+class DreamcatcherProcessor : public juce::AudioProcessor, private juce::AsyncUpdater
 {
 public:
     DreamcatcherProcessor();
@@ -21,7 +21,7 @@ public:
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    double getTailLengthSeconds() const override { return 0.5; }   // Echo-Wolke klingt kurz nach
+    double getTailLengthSeconds() const override { return 3.0; }   // Schwapp-Echos klingen bis zu ca. 3 s nach
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -37,6 +37,8 @@ public:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
+    void handleAsyncUpdate() override { setLatencySamples (reportedLatency.load()); }
+    std::atomic<int> reportedLatency { 0 };
     dch::Engine engine;
     std::atomic<float>* pMode = nullptr;
     std::atomic<float>* pDream = nullptr;

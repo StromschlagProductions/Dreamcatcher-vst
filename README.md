@@ -6,7 +6,7 @@
 </picture>
 
 VST3-Insert-Effekt für Hörspiel-Produktion. Er lässt eine Stimme klingen, als käme sie nicht aus dem Raum der Szene,
-sondern von innen: als **innere Stimme**, als **Erinnerung / Rückblende** oder im **Traum**. Ein Modus-Schalter, ein
+sondern von innen: als **innere Stimme**, als **Erinnerung / Rückblende**, im **Traum** oder als **Geist** mit echtem Reverse-Hall. Ein Modus-Schalter, ein
 Fader, fertig.
 
 **⬇ Download (Windows · VST3 · Stereo):** https://github.com/StromschlagProductions/Dreamcatcher-vst/releases/latest
@@ -42,7 +42,7 @@ die Fenstergröße (50–300 %) werden mit dem Projekt gespeichert. Zu jedem Reg
 
 | Regler | Wirkung |
 |---|---|
-| **Modus** | **Innere Stimme:** Die Stimme rückt ins Innere des Kopfes: leicht verbreitert, ein Hauch Echo, Höhen weicher, Tiefen weg. **Erinnerung:** Die Stimme stottert an einzelnen Stellen, sinkt minimal ab, klingt dünn und dumpf mit Echo wie aus der Ferne der Zeit (für Rückblenden). **Traum:** körnig verstimmt, in einer weiten Wolke aus Echos, dunkel und schwebend. Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über. |
+| **Modus** | **Innere Stimme:** Die Stimme rückt ins Innere des Kopfes: schmal, nah, ein kurzer Hauch Echo, Höhen weicher, Tiefen weg. **Erinnerung:** Die Stimme stottert, sinkt ab, klingt dünn und dumpf; nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts heran und schwellen an (wop, wop), für Rückblenden. **Traum:** körnig verstimmt, in einer weiten, dunklen Echo-Wolke, die langsam anschwillt und schwebend abtaucht. **Geist:** echter Reverse-Hall, vor jedem Wort schwillt ein Geisterhall an, dann kommt die Stimme (meldet rund 0,6 s Latenz). Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über. |
 | **Effekt** | 0 % = die Stimme unbearbeitet, 100 % = der volle Klang des Modus, dazwischen fließend (Standard: 100 %). Doppelklick setzt auf 100 % zurück. |
 
 Das ist wie bei LOCATIONS: Ein Fader bewegt die Stimme zwischen zwei Zuständen. Hier sind es die normal klingende
@@ -62,9 +62,11 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 
 ## Hinweise
 
-- **Latenz:** keine, das Plugin meldet dem Host nichts. Der Effekt setzt mit dem Audio ein. Die bearbeitete Stimme liegt
-  durch die Echo- und Stotter-Bausteine einige Millisekunden hinter der unbearbeiteten, das ist Teil des Klangs.
-  Zwischen 0 und 100 % mischen sich beide, dabei können leichte Kammfilter-Färbungen entstehen.
+- **Latenz:** Nur im Modus **Geist** meldet das Plugin rund 0,6 s Latenz an den Host, damit der Reverse-Hall vor der Stimme
+  liegen kann; die DAW gleicht das aus. Die anderen drei Modi sind latenzfrei. Weil sich die gemeldete Latenz beim
+  Moduswechsel ändert, verwendest du Geist am besten auf einer eigenen Spur oder Plugin-Instanz und automatisierst den Modus
+  nicht quer durch die Szene. Die Echos klingen nach dem Ende der Stimme bis zu etwa drei Sekunden nach.
+  Zwischen 0 und 100 % mischen sich bearbeitete und unbearbeitete Stimme, dabei können leichte Kammfilter-Färbungen entstehen.
 - Der Eingang wird als Stereo verarbeitet; eine Mono-Spur bekommt durch die Echo-Bausteine Stereobreite.
 - Der Pegel ist fest ausgeglichen: bei 100 % ist die Stimme etwa so laut wie bei 0 % (gemessen mit einem
   Testsignal, bei echten Stimmen kann es um ein paar dB abweichen).
@@ -81,6 +83,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Sie wird bei jeder
 Änderung hochgezählt.
 
+- **1.3** – Modi deutlich stärker unterschieden; neues Schwapp-Echo mit Pre-Delay (Ping-Pong, abfallend oder anschwellend) in Erinnerung und Traum; vierter Modus Geist mit echtem Reverse-Hall (Latenz nur in diesem Modus).
 - **1.2** – Hinweis zur Nutzung auf einem Bus in README und Plugin-Hilfe ergänzt.
 - **1.1** – README um den Absatz „Gestalten nicht ersetzen“ ergänzt.
 - **1.0** – Erste Version: Modi Innere Stimme, Erinnerung und Traum, Effekt-Fader 0–100 %, Oberfläche im Stil von
