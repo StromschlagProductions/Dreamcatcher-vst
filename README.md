@@ -21,9 +21,9 @@ ein- und ausblenden, zum Beispiel wenn eine alte Stimme aus einer Überblendung 
 Der Klang jedes Modus ist fest abgestimmt; mit Hall, Echo und Breite lässt er sich nachjustieren. Es gibt keinen Ausgangsregler, und es werden keine eigenen Geräusche
 dazugemischt: Das Plugin verändert nur den Klang der Stimme.
 
-– Lars Eickstädt, Stromschlag Audio
-
 *DREAMCATCHER soll niemandem die Erfahrung abnehmen, solche Szenen selbst zu gestalten. Gerade am Anfang kann es viel Spaß machen und lehrreich sein, eine Traum- oder Erinnerungsstimme selbst aufzubauen und zu hören, wie Verstimmung, Echo, Filter und Automation ineinandergreifen. Ich bin dankbar, dass ich diesen Weg selbst gegangen bin, auch wenn er manchmal umständlich und mühselig war. Gerade dadurch weiß ich, was ich mir von einem Werkzeug wünsche, das all das in einem vereint. DREAMCATCHER soll das Gestalten nicht ersetzen, sondern die technische Umsetzung im Alltag einfacher machen.*
+
+– Lars Eickstädt, Stromschlag Audio
 
 ## Oberfläche
 
