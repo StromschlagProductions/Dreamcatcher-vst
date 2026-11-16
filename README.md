@@ -100,7 +100,7 @@ Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der
 - `Source/DreamcatcherDSP.h`: Klang-Engine (reines C++). Die Klangwerte der drei Modi stehen oben in `kVoicing`.
 - `Source/PluginProcessor.*`, `Source/PluginEditor.*`: JUCE-Plugin und Oberfläche
 - `LICENSES/`: Lizenztext der übernommenen Airwindows-Bausteine
-- `.github/workflows/build.yml`: automatischer Windows-Bau mit Stabilitätstest (pluginval) und Release
+- `.github/workflows/build.yml`: Windows-Bau mit Stabilitätstest (pluginval), nur auf Anforderung gestartet; ein Release entsteht nur, wenn beim Start „release“ angehakt wird (siehe `.github/CI.md`)
 
 ## Danke
 

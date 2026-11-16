@@ -1,10 +1,24 @@
 name: Windows-VST3 bauen
 
+# Sparsamer Betrieb (GitHub-Actions-Kontingent):
+# - Kein automatischer Lauf mehr bei jedem Push. Entwickelt und getestet wird lokal (Bau, DSP-Tests, pluginval).
+# - Der vollstaendige Windows-Bau mit pluginval (Strictness 8) laeuft nur auf Anforderung:
+#   GitHub -> Actions -> "Windows-VST3 bauen" -> "Run workflow". Er ist die abschliessende Abnahme.
+# - Ein Release entsteht nur, wenn beim Start "release" angehakt wird (Standard: aus). Nichts wird automatisch veroeffentlicht.
+# - Ueberholte Laeufe auf demselben Zweig werden abgebrochen, ein haengender Lauf endet nach 20 Minuten.
+# Beschreibung: .github/CI.md
+
 on:
-  push:
-    branches: [main]
-    paths-ignore: ['docs/**', 'README.md']   # Doku-Aenderungen loesen keinen neuen Bau aus
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Nach bestandener Pruefung ein Release mit ZIP erstellen (Download-Link in der README)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -12,7 +26,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +48,7 @@ jobs:
           name: Dreamcatcher-VST3-Windows
           path: build/Dreamcatcher_artefacts/Release/VST3
           if-no-files-found: error
+          retention-days: 14
 
       - name: Stabilitaetstest (pluginval)
         shell: pwsh
@@ -44,10 +59,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: ZIP packen
+        if: ${{ inputs.release }}
         shell: pwsh
         run: Compress-Archive -Path "build/Dreamcatcher_artefacts/Release/VST3/Dreamcatcher.vst3" -DestinationPath "Dreamcatcher-VST3-Windows.zip"
 
       - name: Release mit ZIP erstellen
+        if: ${{ inputs.release }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.DCH_VERSION }}-b${{ github.run_number }}
@@ -55,4 +72,4 @@ jobs:
           make_latest: true
           files: |
             Dreamcatcher-VST3-Windows.zip
-          body: "Windows-VST3 aus dem automatischen Bau. Entpacken, Ordner Dreamcatcher.vst3 nach C:\\Program Files\\Common Files\\VST3 kopieren."
+          body: "Windows-VST3, manuell gestartet und mit pluginval (Strictness 8) geprüft. Entpacken, Ordner Dreamcatcher.vst3 nach C:\\Program Files\\Common Files\\VST3 kopieren."
