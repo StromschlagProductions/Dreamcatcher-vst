@@ -57,7 +57,7 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
               juce::Font (juce::FontOptions (17.0f, juce::Font::bold)), accent);
 
     body ("Dreamcatcher ist ein Insert-Effekt für Stimmen, die nicht im Raum der Szene sprechen: innere Stimme, Erinnerung und Traum. "
-          "Der Klang jedes Modus ist fest abgestimmt. Bedient wird es mit dem Modus, dem Effekt-Fader und drei Drehreglern, mit denen du Hall, Echo und Stereobreite des Modus anpasst.");
+          "Der Klang jedes Modus ist fest abgestimmt. Bedient wird es mit dem Modus, dem Effekt-Fader und vier Drehreglern, mit denen du Hall, Echo, Stereobreite und Ducking des Modus anpasst.");
 
     head ("MODUS");
     body ("Innere Stimme: Die Stimme rückt ins Innere des Kopfes. Schmal und nah, ein winziger, enger Raum, ein Hauch Echo, Höhen weicher, Tiefen weg.");
@@ -82,6 +82,14 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
           "Die unbearbeitete Stimme (Effekt-Fader auf 0 %) bleibt davon unberührt.");
     note ("Der Regler ist monokompatibel: Er verändert nur das Seitensignal. In Mono klingt es bei 0 %, 100 % und 200 % exakt gleich, "
           "man hört dort nur die Breite nicht.");
+
+    head ("DUCKING (Drehregler, 0–100 %)");
+    body ("Ducking drückt die Effektanteile herunter, solange die Originalstimme spricht, wie das interne Ducking eines Hall- oder Delay-Plugins: "
+          "Echos, Echo-Wolke, Hall und im Modus Geist der Reverse-Schwell und das Reverse-Echo werden leiser, sobald die Stimme einsetzt, "
+          "und kehren nach etwa einer Viertelsekunde zurück, wenn sie aufhört. So kannst du Hall und Echo höher drehen, ohne dass die Stimme untergeht.");
+    body ("0 % schaltet das Ducking ab, das ist die Grundeinstellung. 100 % senkt die Effekte bei voller Stimme um etwa 24 dB ab. "
+          "Die Stimme selbst, ihr Stottern und Wabern sowie die Breite bleiben unberührt. Im Modus Geist reagiert der Detektor auf die verzögerte Stimme, "
+          "der Schwell wird also erst gedrückt, wenn das Wort wirklich erklingt.");
 
     head ("EFFEKT (Fader, 0–100 %)");
     body ("0 % = die Stimme unbearbeitet, 100 % = der volle Klang des gewählten Modus. Dazwischen blendet der Fader fließend über. "
@@ -141,6 +149,10 @@ DreamcatcherEditor::DreamcatcherEditor (DreamcatcherProcessor& p) : AudioProcess
     setupKnob (hallKnob, "hall");
     setupKnob (echoKnob, "echo");
     setupKnob (widthKnob, "width");
+    setupKnob (duckKnob, "duck");
+    duckKnob.slider.setDoubleClickReturnValue (true, 0.0);
+    duckKnob.label.setText (u8 ("DUCKING"), juce::dontSendNotification);
+    duckKnob.slider.setTooltip (u8 ("Ducking: Die Stimme drückt Echo, Hall und Reverse herunter, solange sie spricht. 0 % = aus, 100 % = Effekte bis auf −24 dB abgesenkt. Doppelklick: 0 %"));
     widthKnob.label.setText (u8 ("BREITE"), juce::dontSendNotification);
     widthKnob.slider.setTooltip (u8 ("Stereobreite: 0 % = mono, 100 % = wie der Modus abgestimmt ist, 200 % = breiter als die Lautsprecher. Doppelklick: 100 %"));
 
@@ -251,7 +263,7 @@ void DreamcatcherEditor::applyTheme()
     look.setColour (juce::PopupMenu::highlightedBackgroundColourId, theme.accent);
     look.setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::black);
     look.setColour (juce::Label::textColourId, theme.text);
-    for (auto* k : { &hallKnob, &echoKnob, &widthKnob }) k->label.setColour (juce::Label::textColourId, theme.dim);
+    for (auto* k : { &hallKnob, &echoKnob, &widthKnob, &duckKnob }) k->label.setColour (juce::Label::textColourId, theme.dim);
     look.setColour (juce::TextButton::buttonColourId, theme.dark ? theme.panel : theme.bg);
     look.setColour (juce::TextButton::buttonOnColourId, theme.accent);
     look.setColour (juce::TextButton::textColourOffId, theme.text);
@@ -362,13 +374,13 @@ void DreamcatcherEditor::paint (juce::Graphics& g)
     // Karte Modus
     card (12.0f, 76.0f, (float) W - 24.0f, 84.0f, "MODUS");
     // Karte Effekt-Fader
-    card (12.0f, 170.0f, 320.0f, 150.0f, "EFFEKT");
+    card (12.0f, 170.0f, 226.0f, 150.0f, "EFFEKT");
     g.setColour (theme.dim);
     g.setFont (juce::FontOptions (11.5f));
-    g.drawText (u8 ("0 %  ·  Stimme unbearbeitet"), 24, 206, 160, 16, juce::Justification::centredLeft);
-    g.drawText (u8 ("100 %  ·  voller Klang"), 320 - 130, 206, 130, 16, juce::Justification::centredRight);
+    g.drawText (u8 ("0 %  ·  unbearbeitet"), 24, 206, 100, 16, juce::Justification::centredLeft);
+    g.drawText (u8 ("100 %  ·  voll"), 238 - 12 - 90, 206, 90, 16, juce::Justification::centredRight);
     // Karte Hall / Echo
-    card (342.0f, 170.0f, (float) W - 354.0f, 150.0f, m == dch::kGhost ? u8 ("REVERSE & BREITE") : u8 ("HALL · ECHO · BREITE"));
+    card (248.0f, 170.0f, (float) W - 260.0f, 150.0f, m == dch::kGhost ? u8 ("REVERSE · BREITE · DUCKING") : u8 ("HALL · ECHO · BREITE · DUCKING"));
     // Karte Beschreibung
     card (12.0f, 330.0f, (float) W - 24.0f, 78.0f, modeShort (m));
     g.setColour (theme.text);
@@ -398,14 +410,14 @@ void DreamcatcherEditor::resized()
     for (int i = 0; i < 4; ++i)
         modeButtons[i].setBounds (bx + i * (bw + 10), 106, bw, 44);
 
-    fader.setBounds (24, 228, 296, 72);
+    fader.setBounds (22, 228, 206, 72);
     {
-        Knob* ks[3] = { &hallKnob, &echoKnob, &widthKnob };
-        for (int i = 0; i < 3; ++i)
+        Knob* ks[4] = { &hallKnob, &echoKnob, &widthKnob, &duckKnob };
+        for (int i = 0; i < 4; ++i)
         {
-            const int x = 350 + i * 106;
-            ks[i]->label.setBounds (x, 192, 104, 16);
-            ks[i]->slider.setBounds (x + 2, 208, 100, 106);
+            const int x = 254 + i * 104;
+            ks[i]->label.setBounds (x, 192, 102, 16);
+            ks[i]->slider.setBounds (x + 2, 208, 98, 106);
         }
     }
 

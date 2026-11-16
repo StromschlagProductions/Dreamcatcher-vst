@@ -7,7 +7,7 @@
 
 VST3-Insert-Effekt für Hörspiel-Produktion. Er lässt eine Stimme klingen, als käme sie nicht aus dem Raum der Szene,
 sondern von innen: als **innere Stimme**, als **Erinnerung / Rückblende**, im **Traum** oder als **Geist** mit echtem Reverse-Hall. Ein Modus-Schalter, ein
-Fader und drei Drehregler für Hall, Echo und Breite, fertig.
+Fader und vier Drehregler für Hall, Echo, Breite und Ducking, fertig.
 
 **⬇ Download (Windows · VST3 · Stereo):** https://github.com/StromschlagProductions/Dreamcatcher-vst/releases/latest
 
@@ -18,7 +18,7 @@ merkt: Das ist jetzt nicht die Szene, das ist im Kopf. Bisher habe ich das jedes
 zusammengebaut. DREAMCATCHER legt diese Behandlung mit einem Klick auf die Spur und lässt sich über die Zeit
 ein- und ausblenden, zum Beispiel wenn eine alte Stimme aus einer Überblendung in der Rückblende auftaucht.
 
-Der Klang jedes Modus ist fest abgestimmt; mit Hall, Echo und Breite lässt er sich nachjustieren. Es gibt keinen Ausgangsregler, und es werden keine eigenen Geräusche
+Der Klang jedes Modus ist fest abgestimmt; mit Hall, Echo, Breite und Ducking lässt er sich nachjustieren. Es gibt keinen Ausgangsregler, und es werden keine eigenen Geräusche
 dazugemischt: Das Plugin verändert nur den Klang der Stimme.
 
 *DREAMCATCHER soll niemandem die Erfahrung abnehmen, solche Szenen selbst zu gestalten. Gerade am Anfang kann es viel Spaß machen und lehrreich sein, eine Traum- oder Erinnerungsstimme selbst aufzubauen und zu hören, wie Verstimmung, Echo, Filter und Automation ineinandergreifen. Ich bin dankbar, dass ich diesen Weg selbst gegangen bin, auch wenn er manchmal umständlich und mühselig war. Gerade dadurch weiß ich, was ich mir von einem Werkzeug wünsche, das all das in einem vereint. DREAMCATCHER soll das Gestalten nicht ersetzen, sondern die technische Umsetzung im Alltag einfacher machen.*
@@ -31,7 +31,7 @@ dazugemischt: Das Plugin verändert nur den Klang der Stimme.
 |---|---|
 | ![Erinnerung](docs/oberflaeche-dunkel.png) | ![Traum](docs/oberflaeche-hell.png) |
 
-Oben wählt man den Modus, darunter stehen der **Effekt-Fader** und die Drehregler **Hall**, **Echo** und **Breite**. Der **?**-Knopf öffnet die Hilfe, Look Dunkel/Hell und
+Oben wählt man den Modus, darunter stehen der **Effekt-Fader** und die Drehregler **Hall**, **Echo**, **Breite** und **Ducking**. Der **?**-Knopf öffnet die Hilfe, Look Dunkel/Hell und
 die Fenstergröße (50–300 %) werden mit dem Projekt gespeichert. Zu jedem Regler gibt es einen Tooltip.
 
 ## Modi und Regler (beide automatisierbar)
@@ -40,6 +40,7 @@ die Fenstergröße (50–300 %) werden mit dem Projekt gespeichert. Zu jedem Reg
 |---|---|
 | **Modus** | **Innere Stimme:** Die Stimme rückt ins Innere des Kopfes: schmal, nah, ein winziger, enger Raum und ein Hauch Echo, Höhen weicher, Tiefen weg. **Erinnerung:** Die Stimme stottert, sinkt ab, klingt dünn und dumpf in einem kleinen, alten Zimmer, leicht wie von einer leiernden Aufnahme; nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts heran und schwellen an (wop, wop), für Rückblenden. **Traum:** körnig verstimmt, die Tonhöhe wabert langsam, in einem riesigen, dunklen, schwebenden Hall mit einer Echo-Wolke, deren Wiederholungen schief wegdriften. **Geist:** echter Reverse-Hall, vor jedem Wort schwillt ein Geisterhall an und rückwärts gespielte Stücke saugen ins Wort hinein, dann kommt die Stimme, trocken und ohne Nachhall (meldet rund 0,6 s Latenz). Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über. |
 | **Effekt** | 0 % = die Stimme unbearbeitet, 100 % = der volle Klang des Modus, dazwischen fließend (Standard: 100 %). Doppelklick setzt auf 100 % zurück. |
+| **Ducking** | Drehregler 0–100 %, Grundeinstellung 0 % (aus): Die Originalstimme drückt die Effektanteile (Echos, Echo-Wolke, Hall; im Modus Geist Reverse-Hall und Reverse-Echo) herunter, solange sie spricht, und sie kehren nach etwa einer Viertelsekunde zurück, wenn die Stimme aufhört. 100 % senkt die Effekte bei voller Stimme um etwa 24 dB ab. Stimme, Stottern, Wabern und Breite bleiben unberührt. Im Modus Geist reagiert der Detektor auf die verzögerte Stimme. So kannst du Hall und Echo höher drehen, ohne dass die Stimme untergeht. |
 | **Breite** | Drehregler 0–200 %: 0 % = mono, 100 % = so breit, wie der Modus abgestimmt ist, 200 % = deutlich breiter; über 100 % wird das Seitensignal zusätzlich minimal verzögert (Prinzip von Airwindows Wider), dann wirkt es breiter als die Lautsprecher. Monokompatibel: Der Regler verändert nur das Seitensignal, in Mono klingt es bei jeder Einstellung exakt gleich. |
 | **Hall** / **Echo** | Drehregler 0–200 %: 100 % = so, wie der Modus abgestimmt ist, 0 % = aus, 200 % = doppelt so viel. Im Modus Geist heißen sie **Reverse-Hall** und **Reverse-Echo**: so wählst du nur den rückwärts anschwellenden Hall, nur die rückwärts gespielten Echos oder beides. Doppelklick setzt auf 100 % zurück. |
 
@@ -81,6 +82,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Sie wird bei jeder
 Änderung hochgezählt.
 
+- **2.0** – Vierter Drehregler **Ducking** (0–100 %, Grundeinstellung aus): Die Stimme drückt Echos, Hall und Reverse herunter, solange sie spricht; Stimme und Breite bleiben unberührt.
 - **1.9** – Hilfe und README korrigiert: Der Breite-Regler ist monokompatibel (in Mono bei jeder Einstellung exakt gleich).
 - **1.8** – Dritter Drehregler **Breite** (Stereobreite 0–200 %, über 100 % breiter als die Lautsprecher nach dem Prinzip von Airwindows Wider).
 - **1.7** – Erinnerung mit stärkerem Bandleiern; Traum mit stärkerem Wabern, breiter und mit größerem, stärker schwebendem Hall. Pegelausgleich jetzt nach gehörrichtiger Lautheit (LU) an einem stimmähnlichen Signal gemessen.

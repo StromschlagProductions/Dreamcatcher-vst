@@ -22,6 +22,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout DreamcatcherProcessor::creat
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "echo", 1 }, "Echo", NormalisableRange<float> (0.0f, 2.0f), 1.0f, percent));
     // Breite: 0 % = mono, 100 % = wie abgestimmt, 200 % = breiter als die Lautsprecher
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "width", 1 }, "Breite", NormalisableRange<float> (0.0f, 2.0f), 1.0f, percent));
+    // Ducking: wie stark die Stimme die Effekte (Echo, Hall, Reverse) herunterdrueckt; 0 % = aus (Standard)
+    layout.add (std::make_unique<AudioParameterFloat> (ParameterID { "duck", 1 }, "Ducking", NormalisableRange<float> (0.0f, 1.0f), 0.0f, percent));
     return layout;
 }
 
@@ -36,6 +38,7 @@ DreamcatcherProcessor::DreamcatcherProcessor()
     pHall = apvts.getRawParameterValue ("hall");
     pEcho = apvts.getRawParameterValue ("echo");
     pWidth = apvts.getRawParameterValue ("width");
+    pDuck = apvts.getRawParameterValue ("duck");
 }
 
 void DreamcatcherProcessor::prepareToPlay (double sampleRate, int)
@@ -71,7 +74,7 @@ void DreamcatcherProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     engine.setMode (juce::roundToInt (pMode->load()));
     float* l = buffer.getWritePointer (0);
     float* r = numCh > 1 ? buffer.getWritePointer (1) : nullptr;
-    engine.process (l, r, numSamples, (double) pDream->load(), (double) pHall->load(), (double) pEcho->load(), (double) pWidth->load());
+    engine.process (l, r, numSamples, (double) pDream->load(), (double) pHall->load(), (double) pEcho->load(), (double) pWidth->load(), (double) pDuck->load());
 
     if (engine.latencySamples() != reportedLatency.load())
     {

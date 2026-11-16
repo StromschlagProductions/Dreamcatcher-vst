@@ -92,6 +92,12 @@ static const Room kRoom[kNumModes] = {
     { 0.00, 0.65, 0.40, 0.35, 0.55 } }; // Geist: kein Vorwaerts-Hall, nur Reverse (die Stimme bleibt trocken)
 constexpr double kFlutterAmount = 0.52;   // Airwindows-Flutter: Tiefe des Bandleierns
 constexpr double kVibeDrift = 0.62;       // Airwindows-GalacticVibe: Geschwindigkeit des Waberns
+// Ducking: Die Stimme druckt die Effektanteile (Echos, Echo-Wolke, Hall, Reverse) herunter, die Stimme selbst und die Breite bleiben
+constexpr double kDuckAttackSeconds = 0.005;    // Einsetzen, sobald die Stimme kommt
+constexpr double kDuckReleaseSeconds = 0.090;   // Erholung, wenn die Stimme aufhoert (Effekt kehrt nach ca. 0,3 s voll zurueck)
+constexpr double kDuckLoLin = 0.00316;          // ab ca. -50 dBFS beginnt die Absenkung
+constexpr double kDuckHiLin = 0.03162;          // ab ca. -30 dBFS ist sie voll
+constexpr double kDuckFloor = 0.0631;           // bei 100 %: Effekt bis auf -24 dB abgesenkt
 constexpr double kSmoothSeconds = 0.060;    // Zeit, in der Moduswechsel ueberblendet werden
 
 // ======================================================================================================
@@ -787,6 +793,8 @@ public:
         sr = sampleRate;
         smooth = 1.0 - std::exp (-1.0 / (kSmoothSeconds * sr));
         fader = 1.0 - std::exp (-1.0 / (0.020 * sr));
+        duckAtk = 1.0 - std::exp (-1.0 / (kDuckAttackSeconds * sr));
+        duckRel = 1.0 - std::exp (-1.0 / (kDuckReleaseSeconds * sr));
         ens.prepare (sr); glitch.prepare (sr); nasty.prepare (sr);
         flutter.prepare (sr, kFlutterAmount); vibe.prepare (sr, kVibeDrift);
         int n = 1; while ((double) n < 3.4 * sr) n <<= 1;
@@ -815,7 +823,7 @@ public:
         for (auto* r : { &dlL, &dlR, &dryL, &dryR }) r->clear();
         std::fill (revBuf.begin(), revBuf.end(), 0.0); revPos = 0; revPhase = 0; revLpL = revLpR = 0.0;
         ghostRunning = false;
-        std::fill (sideBuf, sideBuf + 64, 0.0); sidePos = 0;
+        std::fill (sideBuf, sideBuf + 64, 0.0); sidePos = 0; duckEnv = 0.0;
         for (int m = 0; m < kNumModes; ++m) { room[m].reset(); roomRunning[m] = false; }
     }
     void setMode (int m) { mode = std::max (0, std::min (kNumModes - 1, m)); }
@@ -824,10 +832,11 @@ public:
 
     // dream: 0..1 (0 = unbearbeitete Stimme, 1 = voller Klang)
     // hall, echo: 0..2 (1 = so, wie der Modus abgestimmt ist)
-    void process (float* left, float* right, int n, double dream, double hall = 1.0, double echo = 1.0, double width = 1.0)
+    // duck: 0..1 (0 = aus)
+    void process (float* left, float* right, int n, double dream, double hall = 1.0, double echo = 1.0, double width = 1.0, double duck = 0.0)
     {
         const Voicing& v = kVoicing[mode];
-        if (! started) { amount = dream; hallK = hall; echoK = echo; widthK = width; started = true; }
+        if (! started) { amount = dream; hallK = hall; echoK = echo; widthK = width; duckK = duck; started = true; }
         const double ghostTarget = mode == kGhost ? 1.0 : 0.0;
         for (int i = 0; i < n; ++i)
         {
@@ -846,6 +855,7 @@ public:
             hallK += (hall - hallK) * fader;
             echoK += (echo - echoK) * fader;
             widthK += (width - widthK) * fader;
+            duckK += (duck - duckK) * fader;
             ghostAmt += (ghostTarget - ghostAmt) * smooth;
 
             // Echo-Zeiten gehoeren zum Modus: Echos erst ausblenden, dann Zeiten wechseln (kein Pitch-Rutschen)
@@ -919,11 +929,32 @@ public:
             else { echoLpL += echoCoef * (0.0 - echoLpL); echoLpR += echoCoef * (0.0 - echoLpR); }
             ++echoPos;
 
+            // 3a. Ducking-Detektor: Pegel der Originalstimme (im Modus Geist der verzoegerten, also wenn das Wort erklingt)
+            const double drl = dryL.tick (rawL), drr = dryR.tick (rawR);
+            double duckGain = 1.0;
+            {
+                const double det = (1.0 - ghostAmt) * std::max (std::fabs (rawL), std::fabs (rawR))
+                                 + ghostAmt * std::max (std::fabs (drl), std::fabs (drr));
+                duckEnv += (det - duckEnv) * (det > duckEnv ? duckAtk : duckRel);
+                if (duckK > 0.0005)
+                {
+                    double x = (duckEnv - kDuckLoLin) / (kDuckHiLin - kDuckLoLin);
+                    x = x < 0.0 ? 0.0 : (x > 1.0 ? 1.0 : x);
+                    x = x * x * (3.0 - 2.0 * x);
+                    duckGain = 1.0 - duckK * x * (1.0 - kDuckFloor);
+                }
+            }
+
             // 3. Breite und Echo-Wolke
             if (cur.wideSoar > 0.0005) sweetWide (l, r, cur.wideSoar, cur.wideBlend);
-            ens.process (l, r, std::min (1.0, cur.ensLevel * echoK));
-            l += echoLpL * echoLevel;
-            r += echoLpR * echoLevel;
+            {
+                const double preL = l, preR = r;
+                ens.process (l, r, std::min (1.0, cur.ensLevel * echoK));
+                l = preL + (l - preL) * duckGain;
+                r = preR + (r - preR) * duckGain;
+            }
+            l += echoLpL * echoLevel * duckGain;
+            r += echoLpR * echoLevel * duckGain;
 
             // 4. Klangfarbe
             l = lp[0].tick (hp[0].tick (l)) * cur.trim;
@@ -932,7 +963,6 @@ public:
             // 5. Geist: Reverse-Hall. Die Stimme wird um die Schwell-Laenge verzoegert, der Schwell liegt davor.
             double outDryL = rawL, outDryR = rawR;
             const double dgl = dlL.tick (l), dgr = dlR.tick (r);        // verzoegerte Stimme (laeuft immer mit)
-            const double drl = dryL.tick (rawL), drr = dryR.tick (rawR);
             if (ghostTarget > 0.0 && ! ghostRunning) { swell.reset(); std::fill (revBuf.begin(), revBuf.end(), 0.0); revLpL = revLpR = 0.0; ghostRunning = true; }
             if (ghostRunning)
             {
@@ -953,8 +983,8 @@ public:
                 ++revPos; if (++revPhase >= revLen) revPhase = 0;
                 const double re = kGhostRevEcho * echoK;
                 const Voicing& gv = kVoicing[kGhost];
-                const double gL = dgl * gv.ghostDry + wl * gv.ghostWet * hallK + revLpL * re;
-                const double gR = dgr * gv.ghostDry + wr * gv.ghostWet * hallK + revLpR * re;
+                const double gL = dgl * gv.ghostDry + (wl * gv.ghostWet * hallK + revLpL * re) * duckGain;
+                const double gR = dgr * gv.ghostDry + (wr * gv.ghostWet * hallK + revLpR * re) * duckGain;
                 l = l * (1.0 - ghostAmt) + gL * ghostAmt;
                 r = r * (1.0 - ghostAmt) + gR * ghostAmt;
                 outDryL = rawL * (1.0 - ghostAmt) + drl * ghostAmt;
@@ -979,7 +1009,7 @@ public:
                     hl += wl * roomLevel[m]; hr += wr * roomLevel[m];
                     if (target == 0.0 && roomLevel[m] < 0.0005) roomRunning[m] = false;
                 }
-                l += hl; r += hr;
+                l += hl * duckGain; r += hr * duckGain;
             }
 
             // 7. Breite (Mitte/Seite): 0 = mono, 1 = wie abgestimmt, 2 = doppelte Seite plus kurz verzoegerte Seite
@@ -1066,7 +1096,7 @@ private:
     int revMask = 0, revPos = 0, revPhase = 0, revLen = 64;
     double revCoef = 0.3, revLpL = 0.0, revLpR = 0.0;
     // Regler Hall / Echo (geglaettet)
-    double hallK = 1.0, echoK = 1.0, widthK = 1.0;
+    double hallK = 1.0, echoK = 1.0, widthK = 1.0, duckK = 0.0, duckEnv = 0.0, duckAtk = 0.01, duckRel = 0.0001;
     double sideBuf[64] {}, sideDelay = 20.0;
     int sidePos = 0;
 };
