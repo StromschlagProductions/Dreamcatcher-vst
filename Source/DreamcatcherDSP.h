@@ -1,15 +1,14 @@
 #pragma once
 // DREAMCATCHER - Klangkern (reines C++, ohne JUCE)
 //
-// Die vier Bausteine sind Portierungen von Airwindows-Code (Chris Johnson, MIT-Lizenz, siehe LICENSES):
+// Die Bausteine (ausser der Verstimmung) sind Portierungen von Airwindows-Code (Chris Johnson, MIT-Lizenz, siehe LICENSES):
 //   SweetWide      -> SweetWide
 //   StereoEnsemble -> StereoEnsemble
 //   GlitchShifter  -> GlitchShifter
-//   PitchNasty     -> PitchNasty
 // Angepasst wurden nur die Struktur (eine Klasse je Baustein, Abtastrate frei), die Dither-Schleife wurde
 // weggelassen. Die Algorithmen selbst sind unveraendert uebernommen.
 //
-// Kette (je Modus mit anderen Anteilen):  Eingang -> GlitchShifter -> PitchNasty -> SweetWide
+// Kette (je Modus mit anderen Anteilen):  Eingang -> GlitchShifter -> Verstimmung -> SweetWide
 //                                         -> StereoEnsemble -> Hoehen-/Tiefenfilter -> Ausgang
 // Der Fader "Effekt" blendet zwischen unbearbeiteter Stimme (0 %) und dem vollen Modus-Klang (100 %).
 
@@ -29,7 +28,7 @@ enum Mode { kInner = 0, kMemory = 1, kDream = 2, kGhost = 3, kNumModes };
 struct Voicing
 {
     double glitchWet;    // Anteil GlitchShifter (Stottern, leichter Tonhoehenabfall), 0..1
-    double nastyWet;     // Anteil PitchNasty (koernige Tonhoehenverschiebung), 0..1
+    double nastyWet;     // Anteil Verstimmung (weiche Tonhoehenverschiebung), 0..1
     double wideSoar;     // SweetWide: Staerke 0..0.3 (0 = aus)
     double wideBlend;    // SweetWide: Anteil der Verbreiterung -0.5..0.5
     double ensDepth;     // StereoEnsemble: Laenge der Echos 0..1
@@ -60,7 +59,7 @@ static const Voicing kVoicing[kNumModes] = {
     // Erinnerung: stark zerfallende, dumpfe Stimme, dazu Pre-Delay und Echos, die schwappend zwischen links und rechts anschwellen
     { 0.55, 0.00, 0.20, 0.20, 0.55, 0.15, 260.0, 3800.0, 2.96,   0.28, 120.0, 240.0, 0.7, 1.0, 2600.0,   0.00, 0.00,   1.00, 0.00, 0.0 },
     // Traum: koernig verstimmt, weite Wolke, dazu langsam anschwellende Echos
-    { 0.00, 0.45, 0.28, 0.40, 0.90, 0.30, 160.0, 4200.0, 4.48,   0.20,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00,   0.00, 0.80, 5.0 },
+    { 0.00, 0.45, 0.28, 0.40, 0.90, 0.30, 160.0, 4200.0, 4.77,   0.20,  60.0, 330.0, 1.0, 0.8, 3000.0,   0.00, 0.00,   0.00, 0.80, 5.0 },
     // Geist: der Hall laeuft rueckwaerts und schwillt vor der Stimme an (Latenz, siehe kGhostSeconds)
     { 0.00, 0.00, 0.10, 0.20, 0.25, 0.15, 150.0, 6000.0, 0.99,   0.00,   0.0,   0.0, 0.0, 0.0, 3000.0,   0.85, 0.95,   0.00, 0.00, 0.0 },
 };
@@ -79,10 +78,8 @@ constexpr double kGhostRevEchoLpHz = 3200.0;
 constexpr double kGlitchSpeed = -0.035;     // negativ = tiefer (ca. -0,6 Halbtoene)
 constexpr double kGlitchTightness = 0.62;   // 0..1; hoeher = haerter geschnitten
 constexpr double kGlitchFeedback = 0.10;    // Rueckkopplung 0..0.67
-// PitchNasty (Traum): Verstimmung und Koernung, feste Werte
-constexpr double kNastyBendSemis = -0.45;   // Verstimmung in Halbtoenen
-constexpr double kNastyGrindSemis = -20.0;  // Koernung: Halbtoene unter dem mittleren C (tiefer = groeber)
-constexpr double kNastyFeedback = 0.25;     // Rueckkopplung 0..1
+// Verstimmung (Traum): fester Wert, weich ueberblendet
+constexpr double kDetuneSemis = -0.45;      // Verstimmung in Halbtoenen
 // Hall je Modus (Airwindows Galactic): Pegel, Ausklang (Replace: hoch = kurz), Helligkeit, Schwebung, Raumgroesse
 struct Room { double level, replace, bright, detune, size; };
 static const Room kRoom[kNumModes] = {
@@ -306,74 +303,57 @@ private:
 };
 
 // ======================================================================================================
-//  PitchNasty (Airwindows, MIT): primitive Tonhoehenverschiebung mit Koernung
+//  Verstimmung (Traum): sauberer Zwei-Kopf-Detune, weich ueberblendet, ohne harte Schnitte
 // ======================================================================================================
-class PitchNasty
+class Detune
 {
 public:
     void prepare (double sampleRate)
     {
         sr = sampleRate;
+        win = std::max (64.0, 0.040 * sr);
         reset();
     }
     void reset()
     {
-        std::fill (d[0], d[0] + kSize, 0.0);
-        std::fill (d[1], d[1] + kSize, 0.0);
-        inCount = 1; outCount = 1.0; switchTransition = false;
-        switchAmount[0] = switchAmount[1] = 0.0;
-        fb[0] = fb[1] = 0.0;
+        std::fill (buf[0], buf[0] + kSize, 0.0);
+        std::fill (buf[1], buf[1] + kSize, 0.0);
+        pos = 0; phase = 0.0;
     }
-    void process (double& l, double& r, double bendSemis, double grindSemis, double feedback)
+    // semis: Verstimmung in Halbtoenen (negativ = tiefer); beide Koepfe laufen gegeneinander versetzt,
+    // jeder wird dort ausgeblendet, wo seine Verzoegerung zurueckspringt (Gewichte sin^2 / cos^2).
+    void process (double& l, double& r, double semis)
     {
-        const double speed = std::pow (2.0, bendSemis / 12.0);
-        const double grindRef = (1.0 / 261.6) * sr;                        // Samples je Zyklus des mittleren C
-        const double grindNote = std::pow (2.0, grindSemis / 12.0);
-        double width = grindRef / grindNote;
-        if (width > 9990) width = 9990;
-        if (width < 8) width = 8;
-
-        double in[2] = { l, r };
-        for (int i = 0; i < 2; ++i)
-        {
-            in[i] += fb[i] * feedback;
-            if (std::fabs (fb[i]) > 1.0) in[i] /= std::fabs (fb[i]);
-            d[i][inCount] = in[i];
-        }
-        ++inCount;
-        outCount += speed;
-        if (outCount > inCount && switchTransition)
-        {
-            switchAmount[0] = switchAmount[1] = 1.0;
-            switchTransition = false;
-        }
-        if (inCount > width) inCount -= (int) width;
-        if (outCount > width) { outCount -= width; switchTransition = true; }
-
-        const int count = (int) std::floor (outCount);
-        const int arrayWidth = (int) std::floor (width);
-        const double frac = outCount - std::floor (outCount);
-        double out[2];
-        for (int i = 0; i < 2; ++i)
-        {
-            double s = d[i][(size_t) (count - ((count > arrayWidth) ? arrayWidth + 1 : 0))] * (1.0 - frac);
-            s += d[i][(size_t) (count + 1 - ((count + 1 > arrayWidth) ? arrayWidth + 1 : 0))] * frac;
-            if (switchAmount[i] > std::fabs (s - d[i][inCount]) * 2.0)
-                switchAmount[i] = (switchAmount[i] * 0.5) + std::fabs (s - d[i][inCount]);
-            s = (d[i][inCount] * switchAmount[i]) + (s * (1.0 - switchAmount[i]));
-            fb[i] = s;
-            out[i] = s;
-        }
-        l = out[0]; r = out[1];
+        buf[0][pos] = l; buf[1][pos] = r;
+        const double inc = (1.0 - std::pow (2.0, semis / 12.0)) / win;
+        const double s = std::sin (3.14159265358979 * phase);
+        const double w1 = s * s, w2 = 1.0 - w1;
+        const double ph2 = phase >= 0.5 ? phase - 0.5 : phase + 0.5;
+        const double d1 = phase * win, d2 = ph2 * win;
+        l = w1 * read (0, d1) + w2 * read (0, d2);
+        r = w1 * read (1, d1) + w2 * read (1, d2);
+        phase += inc;
+        if (phase >= 1.0) phase -= 1.0;
+        if (phase < 0.0) phase += 1.0;
+        pos = (pos + 1) & (kSize - 1);
     }
+
 private:
-    static constexpr int kSize = 10020;
-    double d[2][kSize] {};
-    int inCount = 1;
-    double outCount = 1.0;
-    bool switchTransition = false;
-    double switchAmount[2] {}, fb[2] {};
-    double sr = 44100.0;
+    double read (int c, double delay) const
+    {
+        const double p = (double) pos - delay;
+        double fl = std::floor (p);
+        const double f = p - fl;
+        const int i = (int) fl;
+        const double y0 = buf[c][(i - 1) & (kSize - 1)], y1 = buf[c][i & (kSize - 1)];
+        const double y2 = buf[c][(i + 1) & (kSize - 1)], y3 = buf[c][(i + 2) & (kSize - 1)];
+        const double c1 = 0.5 * (y2 - y0), c2 = y0 - 2.5 * y1 + 2.0 * y2 - 0.5 * y3, c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
+        return ((c3 * f + c2) * f + c1) * f + y1;
+    }
+    static constexpr int kSize = 16384;
+    double buf[2][kSize] {};
+    int pos = 0;
+    double phase = 0.0, win = 1920.0, sr = 44100.0;
 };
 
 // ======================================================================================================
@@ -880,7 +860,7 @@ public:
             r = r * (1.0 - cur.glitchWet) + gr * cur.glitchWet;
 
             double nl = l, nr = r;
-            nasty.process (nl, nr, kNastyBendSemis, kNastyGrindSemis, kNastyFeedback);
+            nasty.process (nl, nr, kDetuneSemis);
             l = l * (1.0 - cur.nastyWet) + nl * cur.nastyWet;
             r = r * (1.0 - cur.nastyWet) + nr * cur.nastyWet;
 
@@ -1078,7 +1058,7 @@ private:
     GalacticVibe vibe;
     double echoPh[9] {}, echoRate[9] {};
     double echoDrift = 0.0;
-    PitchNasty nasty;
+    Detune nasty;
     Biquad hp[2], lp[2];
     // Echo
     std::vector<double> echoBuf;

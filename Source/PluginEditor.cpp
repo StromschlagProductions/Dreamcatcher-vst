@@ -19,7 +19,7 @@ juce::String modeDescription (int m)
             return u8 ("Die Stimme zerfällt: Sie stottert, sinkt ab, klingt dünn und dumpf wie in einem alten Zimmer, leicht wie von einer leiernden Aufnahme. Nach einem Pre-Delay schwappen Echos "
                        "von links nach rechts heran, wop, wop. Für Rückblenden, zum Beispiel die alte Stimme, die aus einer Überblendung kommt.");
         case dch::kDream:
-            return u8 ("Die Stimme ist körnig verstimmt und wabert langsam in der Tonhöhe, in einem riesigen, dunklen, schwebenden Hall mit einer Echo-Wolke, "
+            return u8 ("Die Stimme ist leicht verstimmt und wabert langsam in der Tonhöhe, in einem riesigen, dunklen, schwebenden Hall mit einer Echo-Wolke, "
                        "deren Wiederholungen schief wegdriften. Für Träume, Fieber und Halbschlaf.");
         default:
             return u8 ("Reverse-Hall und Reverse-Echo: Vor jedem Wort schwillt ein Geisterhall an und rückwärts gespielte Stücke saugen ins Wort hinein. Das Plugin meldet dafür rund 0,6 s Latenz, die "
@@ -63,7 +63,7 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
     body ("Innere Stimme: Die Stimme rückt ins Innere des Kopfes. Schmal und nah, ein winziger, enger Raum, ein Hauch Echo, Höhen weicher, Tiefen weg.");
     body ("Erinnerung: Die Stimme stottert, sinkt ab, klingt dünn und dumpf in einem kleinen, alten Zimmer, mit leichtem Bandleiern. Nach einem Pre-Delay schwappen Ping-Pong-Echos von links nach rechts "
           "heran und schwellen an (wop, wop). Gedacht für Rückblenden.");
-    body ("Traum: Körnig verstimmt, die Tonhöhe wabert langsam, in einem riesigen, dunklen, schwebenden Hall und einer Echo-Wolke, deren Wiederholungen immer schiefer wegdriften.");
+    body ("Traum: Weich verstimmt, die Tonhöhe wabert langsam, in einem riesigen, dunklen, schwebenden Hall und einer Echo-Wolke, deren Wiederholungen immer schiefer wegdriften.");
     body ("Geist: Echter Reverse-Hall. Vor jedem Wort schwillt ein Geisterhall an, dann erst kommt die Stimme, trocken und ohne Nachhall. Dazu kommt ein Reverse-Echo: Stücke der Stimme werden rückwärts gespielt und saugen ins Wort hinein. Dafür muss das Plugin die Stimme "
           "um rund 0,6 Sekunden verzögern und meldet diese Latenz dem Host; die DAW gleicht sie aus, sodass der Schwell hörbar VOR der Stimme liegt.");
     body ("Der Modus lässt sich automatisieren. Beim Wechsel blendet das Plugin in etwa einer zehntel Sekunde über, es knackt nicht.");
@@ -110,7 +110,7 @@ static juce::AttributedString buildHelp (juce::Colour text, juce::Colour accent,
 
     head ("Idee und Konzept");
     body ("Lars Eickstädt, Stromschlag Audio");
-    note ("Gebaut mit JUCE. Die Klangbausteine SweetWide, StereoEnsemble, GlitchShifter, PitchNasty, Flutter, GalacticVibe und der Hall Galactic sind Portierungen von Airwindows-Code "
+    note ("Gebaut mit JUCE. Die Klangbausteine SweetWide, StereoEnsemble, GlitchShifter, Flutter, GalacticVibe und der Hall Galactic sind Portierungen von Airwindows-Code "
           "(Chris Johnson, MIT-Lizenz).");
     return s;
 }
@@ -136,7 +136,7 @@ DreamcatcherEditor::DreamcatcherEditor (DreamcatcherProcessor& p) : AudioProcess
     }
     modeButtons[0].setTooltip (u8 ("Die Stimme im Kopf einer Figur: nah, leicht verbreitert, weich"));
     modeButtons[1].setTooltip (u8 ("Rückblende: stotternd, abgesunken, dünn und dumpf, mit heranschwappenden Echos"));
-    modeButtons[2].setTooltip (u8 ("Traum: körnig verstimmt, in einer weiten, anschwellenden Echo-Wolke"));
+    modeButtons[2].setTooltip (u8 ("Traum: weich verstimmt, in einer weiten, anschwellenden Echo-Wolke"));
     modeButtons[3].setTooltip (u8 ("Geist: Reverse-Hall und Reverse-Echo vor der Stimme (meldet ca. 0,6 s Latenz)"));
 
     fader.setSliderStyle (juce::Slider::LinearHorizontal);

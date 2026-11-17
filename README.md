@@ -82,6 +82,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Sie wird bei jeder
 Änderung hochgezählt.
 
+- **2.1** – Traum: Das Knacken und das leise, körnige „8-Bit“-Rauschen im Nachklang sind weg. Ursache war nicht das Ducking, sondern die harte Verstimmung (PitchNasty); sie ist durch eine weiche, überblendete Verstimmung ersetzt. Pegel neu abgeglichen.
 - **2.0** – Vierter Drehregler **Ducking** (0–100 %, Grundeinstellung aus): Die Stimme drückt Echos, Hall und Reverse herunter, solange sie spricht; Stimme und Breite bleiben unberührt.
 - **1.9** – Hilfe und README korrigiert: Der Breite-Regler ist monokompatibel (in Mono bei jeder Einstellung exakt gleich).
 - **1.8** – Dritter Drehregler **Breite** (Stereobreite 0–200 %, über 100 % breiter als die Lautsprecher nach dem Prinzip von Airwindows Wider).
@@ -107,7 +108,7 @@ Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der
 **SOUNDJOB / Markus Hildebrandt** – Beta-Testing
 
 Gebaut mit [JUCE](https://juce.com) 8. Die Klangbausteine **SweetWide**, **StereoEnsemble**, **GlitchShifter**,
-**PitchNasty**, **Flutter**, **GalacticVibe** und der Hall **Galactic** sind Portierungen von Airwindows-Code von Chris Johnson
+**Flutter**, **GalacticVibe** und der Hall **Galactic** sind Portierungen von Airwindows-Code von Chris Johnson
 ([github.com/airwindows](https://github.com/airwindows/airwindows), MIT-Lizenz). Angepasst wurden nur die Struktur
 (freie Abtastrate) und die Dither-Stufe, die weggelassen ist; die Algorithmen selbst sind übernommen.
 
