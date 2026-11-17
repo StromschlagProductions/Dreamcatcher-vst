@@ -39,11 +39,12 @@ DreamcatcherProcessor::DreamcatcherProcessor()
     pEcho = apvts.getRawParameterValue ("echo");
     pWidth = apvts.getRawParameterValue ("width");
     pDuck = apvts.getRawParameterValue ("duck");
+    startTimerHz (30);
 }
 
 void DreamcatcherProcessor::prepareToPlay (double sampleRate, int)
 {
-    engine.setMode (juce::roundToInt (pMode->load()));   // vor prepare: Startzustand passt gleich zum Modus
+    engine.setMode (juce::roundToInt ((float) dch::finiteClamp (pMode->load(), 0, dch::kNumModes - 1, 0)));   // vor prepare: Startzustand passt gleich zum Modus
     engine.prepare (sampleRate);
     reportedLatency = engine.latencySamples();
     setLatencySamples (reportedLatency.load());   // nur im Modus Geist: Vorlauf fuer den Reverse-Hall, gleicht der Host aus
@@ -71,7 +72,7 @@ void DreamcatcherProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     if (getTotalNumInputChannels() == 1 && numCh > 1)
         buffer.copyFrom (1, 0, buffer, 0, 0, numSamples);
 
-    engine.setMode (juce::roundToInt (pMode->load()));
+    engine.setMode (juce::roundToInt ((float) dch::finiteClamp (pMode->load(), 0, dch::kNumModes - 1, 0)));
     float* l = buffer.getWritePointer (0);
     float* r = numCh > 1 ? buffer.getWritePointer (1) : nullptr;
     engine.process (l, r, numSamples, (double) pDream->load(), (double) pHall->load(), (double) pEcho->load(), (double) pWidth->load(), (double) pDuck->load());
@@ -79,7 +80,7 @@ void DreamcatcherProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     if (engine.latencySamples() != reportedLatency.load())
     {
         reportedLatency = engine.latencySamples();   // Moduswechsel: Host ueber die neue Latenz informieren
-        triggerAsyncUpdate();
+        // Timer publishes the new latency outside the audio callback.
     }
 }
 

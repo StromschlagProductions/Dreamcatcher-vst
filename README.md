@@ -82,6 +82,7 @@ Stimme und der Traum. Einen extra Ein-/Ausschalter gibt es nicht, 0 % ist aus.
 Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der Release. Sie wird bei jeder
 Änderung hochgezählt.
 
+- **2.2** – Echtzeitsicherer Reset ohne neue Pufferreservierungen, Latenzmeldung ohne OS-Nachricht aus dem Audio-Thread, begrenzte Ringzähler und neue Regressionstests. [Details](docs/RELEASE_NOTES.md).
 - **2.1** – Traum: Das Knacken und das leise, körnige „8-Bit“-Rauschen im Nachklang sind weg. Ursache war nicht das Ducking, sondern die harte Verstimmung (PitchNasty); sie ist durch eine weiche, überblendete Verstimmung ersetzt. Pegel neu abgeglichen.
 - **2.0** – Vierter Drehregler **Ducking** (0–100 %, Grundeinstellung aus): Die Stimme drückt Echos, Hall und Reverse herunter, solange sie spricht; Stimme und Breite bleiben unberührt.
 - **1.9** – Hilfe und README korrigiert: Der Breite-Regler ist monokompatibel (in Mono bei jeder Einstellung exakt gleich).
