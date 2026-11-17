@@ -34,21 +34,38 @@ jobs:
         shell: pwsh
         run: |
           $v = (Get-Content VERSION -TotalCount 1).Trim()
+          if ($v -notmatch '^(0|[1-9][0-9]*)\.[0-9]$') { throw "VERSION muss dem Schema 1.0 ... 1.9, 2.0 ... folgen" }
           "DCH_VERSION=$v" >> $env:GITHUB_ENV
+          "ZIP_NAME=Dreamcatcher-v$v-Windows-VST3.zip" >> $env:GITHUB_ENV
+          if (-not (Test-Path "docs/releases/$v.md")) { throw "Release-Hinweise fuer $v fehlen" }
           if ("${{ inputs.publish }}" -eq "true" -and "${{ github.ref }}" -ne "refs/heads/main") { Write-Error "Release nur auf main"; exit 1 }
 
       - name: Herstelleridentitaet pruefen
         shell: pwsh
         run: |
           $cmake = Get-Content CMakeLists.txt -Raw
-          if ($cmake -notmatch 'COMPANY_NAME\\s+"Stromschlag Audio"') { throw "Hersteller muss Stromschlag Audio sein" }
-          if ($cmake -match '(?i)COMPANY_NAME\\s+"[^"]*(Claude|Anthropic)') { throw "Falscher Plugin-Hersteller" }
+          if ($cmake -notmatch 'COMPANY_NAME\s+"Stromschlag Audio"') { throw "Hersteller muss Stromschlag Audio sein" }
+          if ($cmake -match '(?i)COMPANY_NAME\s+"[^"]*(Claude|Anthropic)') { throw "Falscher Plugin-Hersteller" }
 
       - name: Konfigurieren
         run: cmake -B build -A x64
 
       - name: Bauen
         run: cmake --build build --config Release --parallel
+
+      - name: Gebaute VST3-Version pruefen
+        shell: pwsh
+        run: |
+          $bundle = "build/Dreamcatcher_artefacts/Release/VST3/Dreamcatcher.vst3"
+          $metadata = Get-Content "$bundle/Contents/Resources/moduleinfo.json" -Raw
+          $match = [regex]::Match($metadata, '"Version"\s*:\s*"([^"]+)"')
+          $allowed = '^' + [regex]::Escape($env:DCH_VERSION) + '(\.0){0,2}$'
+          if (-not $match.Success -or $match.Groups[1].Value -notmatch $allowed) { throw "VST3-Metadaten passen nicht zu VERSION" }
+          $native = (Get-Item "$bundle/Contents/x86_64-win/Dreamcatcher.vst3").VersionInfo
+          foreach ($value in @($native.FileVersion, $native.ProductVersion)) {
+            if ($value -notmatch $allowed) { throw "Windows-Binaerversion $value passt nicht zu VERSION" }
+          }
+          Write-Host "VST3 und Windows-Binaerdatei entsprechen $env:DCH_VERSION"
 
       - name: Regressionstests
         run: ctest --test-dir build -C Release --output-on-failure
@@ -72,7 +89,7 @@ jobs:
       - name: ZIP packen
         if: ${{ inputs.publish && github.ref == 'refs/heads/main' }}
         shell: pwsh
-        run: Compress-Archive -Path "build/Dreamcatcher_artefacts/Release/VST3/Dreamcatcher.vst3" -DestinationPath "Dreamcatcher-VST3-Windows.zip"
+        run: Compress-Archive -Path "build/Dreamcatcher_artefacts/Release/VST3/Dreamcatcher.vst3" -DestinationPath "$env:ZIP_NAME"
 
       - name: Release mit ZIP erstellen
         if: ${{ inputs.publish && github.ref == 'refs/heads/main' }}
@@ -82,5 +99,5 @@ jobs:
           name: Dreamcatcher v${{ env.DCH_VERSION }}
           make_latest: true
           files: |
-            Dreamcatcher-VST3-Windows.zip
-          body_path: docs/RELEASE_NOTES.md
+            ${{ env.ZIP_NAME }}
+          body_path: docs/releases/${{ env.DCH_VERSION }}.md
