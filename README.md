@@ -102,7 +102,9 @@ Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der
 - `LICENSES/`: Lizenztext der übernommenen Airwindows-Bausteine
 - `.github/workflows/build.yml`: Windows-Bau mit Stabilitätstest (pluginval), nur auf Anforderung gestartet; ein Release entsteht nur, wenn beim Start „release“ angehakt wird (siehe `.github/CI.md`)
 
-## Danke
+## Beta-Test und Danke
+
+**SOUNDJOB / Markus Hildebrandt** – Beta-Testing
 
 Gebaut mit [JUCE](https://juce.com) 8. Die Klangbausteine **SweetWide**, **StereoEnsemble**, **GlitchShifter**,
 **PitchNasty**, **Flutter**, **GalacticVibe** und der Hall **Galactic** sind Portierungen von Airwindows-Code von Chris Johnson
