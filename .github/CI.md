@@ -22,10 +22,12 @@ abschließenden Prüfung ändert sich nichts. Es gibt weder automatische Release
 2. **Pushen** darf man jederzeit, das startet keinen Lauf mehr.
 3. **Abnahme:** Auf GitHub unter *Actions → Windows-VST3 bauen → Run workflow* starten.
    - „release“ **nicht** angehakt: Bau und pluginval laufen, die VST3 liegt 14 Tage als Artefakt des Laufs bereit.
-   - „release“ angehakt: zusätzlich entsteht ein Release mit `Dreamcatcher-VST3-Windows.zip`, auf das der Download-Link in der README zeigt.
+   - „release“ angehakt: zusätzlich entsteht ein Release mit `Dreamcatcher-v<VERSION>-Windows-VST3.zip`, auf das der Download-Link in der README zeigt.
 4. Pro Version möglichst **einen** Lauf, erst wenn die Version fertig ist.
 
 ## Mögliche weitere Einsparung (nicht eingebaut)
 
 Der JUCE-Quelltext wird bei jedem Lauf neu geladen. Ein Cache dafür würde etwa eine halbe Minute sparen; der Hauptteil ist das Kompilieren.
 Das ist bewusst nicht eingebaut, weil sich der Cache nur in einem echten Lauf prüfen lässt.
+
+Verbindliches öffentliches Versionsschema: `docs/VERSIONING.md` (ohne Build-Suffix).
