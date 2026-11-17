@@ -81,3 +81,11 @@ if(BUILD_TESTING)
     target_link_libraries(AudioProcessorTests PRIVATE Dreamcatcher)
     add_test(NAME AudioProcessor COMMAND AudioProcessorTests)
 endif()
+
+# Real editor snapshots, excluded from normal plugin/release builds.
+juce_add_console_app(DreamcatcherScreenshot PRODUCT_NAME "Dreamcatcher screenshot")
+target_sources(DreamcatcherScreenshot PRIVATE tools/screenshot.cpp)
+target_include_directories(DreamcatcherScreenshot PRIVATE Source $<TARGET_PROPERTY:Dreamcatcher,INCLUDE_DIRECTORIES>)
+target_compile_definitions(DreamcatcherScreenshot PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 PLUGIN_VERSION_TEXT="${DCH_VERSION}")
+target_link_libraries(DreamcatcherScreenshot PRIVATE Dreamcatcher)
+set_target_properties(DreamcatcherScreenshot PROPERTIES EXCLUDE_FROM_ALL TRUE)
