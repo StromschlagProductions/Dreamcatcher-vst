@@ -107,6 +107,8 @@ Die Versionsnummer steht in der Datei `VERSION`, im Plugin-Kopf und im Namen der
 
 **SOUNDJOB / Markus Hildebrandt** – Beta-Testing
 
+Ein großes Dankeschön an **Markus Hildebrandt** von SOUNDJOB. Markus betreibt ein eigenes Tonstudio und hat weit mehr Hörspiele produziert als ich. Er hat DREAMCATCHER im Studioalltag getestet und mir ehrliches, fachkundiges Feedback gegeben. Seine Rückmeldung zum Knacken im Modus Traum hat zu Version 2.1 geführt, in der die Verstimmung weich überblendet und der Nachklang sauber ist. Dafür danke ich ihm sehr: Seine Erfahrung hat das Plugin spürbar besser gemacht.
+
 Gebaut mit [JUCE](https://juce.com) 8. Die Klangbausteine **SweetWide**, **StereoEnsemble**, **GlitchShifter**,
 **Flutter**, **GalacticVibe** und der Hall **Galactic** sind Portierungen von Airwindows-Code von Chris Johnson
 ([github.com/airwindows](https://github.com/airwindows/airwindows), MIT-Lizenz). Angepasst wurden nur die Struktur
