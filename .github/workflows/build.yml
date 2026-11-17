@@ -4,21 +4,21 @@ name: Windows-VST3 bauen
 # - Kein automatischer Lauf mehr bei jedem Push. Entwickelt und getestet wird lokal (Bau, DSP-Tests, pluginval).
 # - Der vollstaendige Windows-Bau mit pluginval (Strictness 8) laeuft nur auf Anforderung:
 #   GitHub -> Actions -> "Windows-VST3 bauen" -> "Run workflow". Er ist die abschliessende Abnahme.
-# - Ein Release entsteht nur, wenn beim Start "release" angehakt wird (Standard: aus). Nichts wird automatisch veroeffentlicht.
+# - Ein Release entsteht nur, wenn beim Start "publish" angehakt wird (Standard: aus), ausschliesslich auf main.
 # - Ueberholte Laeufe auf demselben Zweig werden abgebrochen, ein haengender Lauf endet nach 20 Minuten.
 # Beschreibung: .github/CI.md
 
 on:
   workflow_dispatch:
     inputs:
-      release:
-        description: "Nach bestandener Pruefung ein Release mit ZIP erstellen (Download-Link in der README)"
+      publish:
+        description: "Release mit ZIP veroeffentlichen (nur auf main)"
         type: boolean
         default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ ! inputs.publish }}
 
 permissions:
   contents: write
@@ -35,6 +35,7 @@ jobs:
         run: |
           $v = (Get-Content VERSION -TotalCount 1).Trim()
           "DCH_VERSION=$v" >> $env:GITHUB_ENV
+          if ("${{ inputs.publish }}" -eq "true" -and "${{ github.ref }}" -ne "refs/heads/main") { Write-Error "Release nur auf main"; exit 1 }
 
       - name: Konfigurieren
         run: cmake -B build -A x64
@@ -62,12 +63,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: ZIP packen
-        if: ${{ inputs.release }}
+        if: ${{ inputs.publish && github.ref == 'refs/heads/main' }}
         shell: pwsh
         run: Compress-Archive -Path "build/Dreamcatcher_artefacts/Release/VST3/Dreamcatcher.vst3" -DestinationPath "Dreamcatcher-VST3-Windows.zip"
 
       - name: Release mit ZIP erstellen
-        if: ${{ inputs.release }}
+        if: ${{ inputs.publish && github.ref == 'refs/heads/main' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.DCH_VERSION }}-b${{ github.run_number }}
