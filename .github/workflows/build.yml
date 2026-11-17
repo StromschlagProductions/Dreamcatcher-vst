@@ -42,6 +42,9 @@ jobs:
       - name: Bauen
         run: cmake --build build --config Release --parallel
 
+      - name: Regressionstests
+        run: ctest --test-dir build -C Release --output-on-failure
+
       - name: Plugin bereitstellen
         uses: actions/upload-artifact@v4
         with:
@@ -72,4 +75,4 @@ jobs:
           make_latest: true
           files: |
             Dreamcatcher-VST3-Windows.zip
-          body: "Windows-VST3, manuell gestartet und mit pluginval (Strictness 8) geprüft. Entpacken, Ordner Dreamcatcher.vst3 nach C:\\Program Files\\Common Files\\VST3 kopieren."
+          body_path: docs/RELEASE_NOTES.md

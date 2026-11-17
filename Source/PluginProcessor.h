@@ -2,11 +2,11 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "DreamcatcherDSP.h"
 
-class DreamcatcherProcessor : public juce::AudioProcessor, private juce::AsyncUpdater
+class DreamcatcherProcessor : public juce::AudioProcessor, private juce::Timer
 {
 public:
     DreamcatcherProcessor();
-    ~DreamcatcherProcessor() override = default;
+    ~DreamcatcherProcessor() override { stopTimer(); }
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -37,7 +37,7 @@ public:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
-    void handleAsyncUpdate() override { setLatencySamples (reportedLatency.load()); }
+    void timerCallback() override { const int desired = reportedLatency.load(); if (getLatencySamples() != desired) setLatencySamples (desired); }
     std::atomic<int> reportedLatency { 0 };
     dch::Engine engine;
     std::atomic<float>* pMode = nullptr;

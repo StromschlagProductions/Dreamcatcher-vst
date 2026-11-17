@@ -20,6 +20,9 @@
 
 namespace dch
 {
+inline double validRate (double x) { return std::isfinite (x) && x >= 8000 && x <= 384000 ? x : 48000; }
+inline double finiteClamp (double x, double lo, double hi, double fallback) { return std::isfinite (x) ? std::clamp (x, lo, hi) : fallback; }
+
 enum Mode { kInner = 0, kMemory = 1, kDream = 2, kGhost = 3, kNumModes };
 
 // ======================================================================================================
@@ -177,7 +180,17 @@ public:
         for (auto& c : ch) { c = Chan(); c.p.assign (131076, 0); }
         gcount = 0; lastwidth = 0; flip = false;
     }
-    void reset() { prepare (rate * 44100.0); }
+    void reset()
+    {
+        for (auto& c : ch)
+        {
+            auto storage = std::move (c.p);
+            c = Chan {};
+            c.p = std::move (storage);
+            std::fill (c.p.begin(), c.p.end(), 0);
+        }
+        gcount = 0; lastwidth = 0; flip = false;
+    }
 
     // l, r: Eingang, Rueckgabe: Ergebnis (voll "nass")
     void process (double& l, double& r, double speed, double tightness, double feedback)
@@ -770,7 +783,7 @@ class Engine
 public:
     void prepare (double sampleRate)
     {
-        sr = sampleRate;
+        sr = validRate (sampleRate);
         smooth = 1.0 - std::exp (-1.0 / (kSmoothSeconds * sr));
         fader = 1.0 - std::exp (-1.0 / (0.020 * sr));
         duckAtk = 1.0 - std::exp (-1.0 / (kDuckAttackSeconds * sr));
@@ -805,6 +818,9 @@ public:
         ghostRunning = false;
         std::fill (sideBuf, sideBuf + 64, 0.0); sidePos = 0; duckEnv = 0.0;
         for (int m = 0; m < kNumModes; ++m) { room[m].reset(); roomRunning[m] = false; }
+        counter = 0; echoPos = sidePos = 0;
+        std::fill (echoPh, echoPh + 9, 0.0);
+        snapToMode (mode);
     }
     void setMode (int m) { mode = std::max (0, std::min (kNumModes - 1, m)); }
     // Latenz, die dem Host gemeldet werden muss: nur im Modus Geist (Schwell liegt VOR der Stimme)
@@ -815,6 +831,9 @@ public:
     // duck: 0..1 (0 = aus)
     void process (float* left, float* right, int n, double dream, double hall = 1.0, double echo = 1.0, double width = 1.0, double duck = 0.0)
     {
+        dream = finiteClamp (dream, 0, 1, 1);
+        hall = finiteClamp (hall, 0, 2, 1); echo = finiteClamp (echo, 0, 2, 1);
+        width = finiteClamp (width, 0, 2, 1); duck = finiteClamp (duck, 0, 1, 0);
         const Voicing& v = kVoicing[mode];
         if (! started) { amount = dream; hallK = hall; echoK = echo; widthK = width; duckK = duck; started = true; }
         const double ghostTarget = mode == kGhost ? 1.0 : 0.0;
@@ -850,7 +869,7 @@ public:
                 for (auto& f : lp) f.set (false, cur.lowpassHz, sr);
             }
 
-            const double rawL = left[i], rawR = right != nullptr ? right[i] : left[i];
+            const double rawL = finiteClamp (left[i], -4, 4, 0), rawR = right != nullptr ? finiteClamp (right[i], -4, 4, 0) : rawL;
             double l = rawL, r = rawR;
 
             // 1. Tonhoehen- und Stotterbausteine laufen immer mit (frische Puffer), der Anteil wird ueberblendet
@@ -907,7 +926,7 @@ public:
                 echoLpR += echoCoef * (eR - echoLpR);
             }
             else { echoLpL += echoCoef * (0.0 - echoLpL); echoLpR += echoCoef * (0.0 - echoLpR); }
-            ++echoPos;
+            echoPos = (echoPos + 1) & echoMask;
 
             // 3a. Ducking-Detektor: Pegel der Originalstimme (im Modus Geist der verzoegerten, also wenn das Wort erklingt)
             const double drl = dryL.tick (rawL), drr = dryR.tick (rawR);
@@ -960,7 +979,7 @@ public:
                 const int k1 = revPhase, k2 = (revPhase + h) % revLen, k3 = (revPhase + q) % revLen, k4 = (k3 + h) % revLen;
                 revLpL += revCoef * (grain (k1) + grain (k2) - revLpL);
                 revLpR += revCoef * (grain (k3) + grain (k4) - revLpR);
-                ++revPos; if (++revPhase >= revLen) revPhase = 0;
+                revPos = (revPos + 1) & revMask; if (++revPhase >= revLen) revPhase = 0;
                 const double re = kGhostRevEcho * echoK;
                 const Voicing& gv = kVoicing[kGhost];
                 const double gL = dgl * gv.ghostDry + (wl * gv.ghostWet * hallK + revLpL * re) * duckGain;
@@ -1003,7 +1022,7 @@ public:
                     const int i0 = (int) sideDelay; const double fr = sideDelay - i0;
                     sd = sideBuf[(size_t) ((sidePos - i0) & 63)] * (1.0 - fr) + sideBuf[(size_t) ((sidePos - i0 - 1) & 63)] * fr;
                 }
-                ++sidePos;
+                sidePos = (sidePos + 1) & 63;
                 const double s2 = side * widthK + (widthK > 1.0 ? (widthK - 1.0) * 0.7 * sd : 0.0);
                 l = mid + s2; r = mid - s2;
             }
